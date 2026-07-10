@@ -1,0 +1,52 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "sim/isg/isg_watchdog.h"
+
+#include "googletest/include/gtest/gtest.h"
+#include "absl/status/status.h"
+
+namespace coralnpu {
+namespace fuzzer {
+namespace {
+
+TEST(IsgWatchdogTest, TickUntilExceeded) {
+  IsgWatchdog watchdog(3);
+
+  EXPECT_TRUE(watchdog.Tick().ok());
+  EXPECT_TRUE(watchdog.Tick().ok());
+  EXPECT_TRUE(watchdog.Tick().ok());
+
+  absl::Status status = watchdog.Tick();
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(absl::IsDeadlineExceeded(status));
+}
+
+TEST(IsgWatchdogTest, ResetRestoresCount) {
+  IsgWatchdog watchdog(2);
+
+  EXPECT_TRUE(watchdog.Tick().ok());
+  EXPECT_TRUE(watchdog.Tick().ok());
+
+  watchdog.Reset();
+
+  EXPECT_TRUE(watchdog.Tick().ok());
+  EXPECT_TRUE(watchdog.Tick().ok());
+
+  EXPECT_FALSE(watchdog.Tick().ok());
+}
+
+}  // namespace
+}  // namespace fuzzer
+}  // namespace coralnpu

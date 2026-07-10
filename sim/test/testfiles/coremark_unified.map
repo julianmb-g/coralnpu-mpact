@@ -1,0 +1,356 @@
+Archive member included to satisfy reference by file (symbol)
+
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+                              local_coremark_unified.o (__adddf3)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+                              local_coremark_unified.o (__divdf3)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+                              local_coremark_unified.o (__gtdf2)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+                              local_coremark_unified.o (__ltdf2)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+                              local_coremark_unified.o (__muldf3)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+                              local_coremark_unified.o (__subdf3)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+                              local_coremark_unified.o (__fixdfsi)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+                              local_coremark_unified.o (__fixunsdfsi)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+                              local_coremark_unified.o (__floatsidf)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+                              local_coremark_unified.o (__floatunsidf)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+                              local_coremark_unified.o (__extendsfdf2)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+                              /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o) (__clzsi2)
+/usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+                              /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o) (__clz_tab)
+/usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a(libc_a-memset.o)
+                              local_coremark_unified.o (memset)
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+RAM              0x00001000         0x08000000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD local_crt0.o
+LOAD local_coremark_unified.o
+LOAD /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libm.a
+LOAD /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a
+START GROUP
+LOAD /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a
+LOAD /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libgloss.a
+END GROUP
+LOAD /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a
+                0x00001000                        . = 0x1000
+
+.text           0x00001000     0x73c0
+ *(.text.init)
+ .text.init     0x00001000       0x6c local_crt0.o
+                0x00001000                _start
+ *(.text .text.*)
+ .text          0x0000106c        0x0 local_crt0.o
+ .text          0x0000106c     0x3d24 local_coremark_unified.o
+                0x0000106c                _fstat
+                0x0000107c                _isatty
+                0x00001084                _close
+                0x0000108c                _lseek
+                0x00001094                _read
+                0x0000109c                _write
+                0x00001194                ee_printf
+                0x00001f6c                _exit
+                0x00001fa8                abort
+                0x00001fc4                start_time
+                0x00001fd4                stop_time
+                0x00001fe4                get_time
+                0x00001ffc                time_in_secs
+                0x00002024                portable_malloc
+                0x00002060                portable_free
+                0x00002064                reset_portable_malloc
+                0x00002070                _sbrk
+                0x000020bc                portable_init
+                0x000020c8                portable_fini
+                0x000020dc                calc_func
+                0x00002204                cmp_complex
+                0x00002448                cmp_idx
+                0x0000249c                copy_info
+                0x000024ac                core_bench_list
+                0x00002b5c                core_list_init
+                0x00002e78                core_list_insert_new
+                0x00002ed4                core_list_remove
+                0x00002efc                core_list_undo_remove
+                0x00002f1c                core_list_find
+                0x00002f68                core_list_reverse
+                0x00002f8c                core_list_mergesort
+                0x00003140                core_init_state
+                0x00003314                core_state_transition
+                0x000035fc                core_bench_state
+                0x00003808                iterate
+                0x000038d8                get_seed_32
+                0x00003930                crcu8
+                0x00003a60                crcu16
+                0x00003c88                crcu32
+                0x000040a8                crc16
+                0x000042d4                check_data_types
+                0x000042dc                core_init_matrix
+                0x00004464                matrix_sum
+                0x000044f0                matrix_mul_const
+                0x00004584                matrix_add_const
+                0x000045d8                matrix_mul_vect
+                0x00004630                matrix_mul_matrix
+                0x000046b8                matrix_mul_matrix_bitextract
+                0x000047cc                matrix_test
+                0x00004d54                core_bench_matrix
+ .text.startup  0x00004d90      0xa00 local_coremark_unified.o
+                0x00004d90                main
+ .text          0x00005790        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .text.__adddf3
+                0x00005790      0xaa4 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+                0x00005790                __adddf3
+ .text          0x00006234        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .text.__divdf3
+                0x00006234      0x880 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+                0x00006234                __divdf3
+ .text          0x00006ab4        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .text.__gedf2  0x00006ab4       0xd8 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+                0x00006ab4                __gtdf2
+                0x00006ab4                __gedf2
+ .text          0x00006b8c        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .text.__ledf2  0x00006b8c       0xd8 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+                0x00006b8c                __ltdf2
+                0x00006b8c                __ledf2
+ .text          0x00006c64        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .text.__muldf3
+                0x00006c64      0x798 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+                0x00006c64                __muldf3
+ .text          0x000073fc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .text.__subdf3
+                0x000073fc      0xab8 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+                0x000073fc                __subdf3
+ .text          0x00007eb4        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .text.__fixdfsi
+                0x00007eb4       0xf4 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+                0x00007eb4                __fixdfsi
+ .text          0x00007fa8        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .text.__fixunsdfsi
+                0x00007fa8       0xc0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+                0x00007fa8                __fixunsdfsi
+ .text          0x00008068        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .text.__floatsidf
+                0x00008068       0xa0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+                0x00008068                __floatsidf
+ .text          0x00008108        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .text.__floatunsidf
+                0x00008108       0x7c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+                0x00008108                __floatunsidf
+ .text          0x00008184        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .text.__extendsfdf2
+                0x00008184      0x114 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+                0x00008184                __extendsfdf2
+ .text          0x00008298        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .text.__clzsi2
+                0x00008298       0x4c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+                0x00008298                __clzsi2
+ .text          0x000082e4        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+ .text          0x000082e4       0xdc /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a(libc_a-memset.o)
+                0x000082e4                memset
+
+.tohost         0x000083c0      0x100
+                0x000083c0                        . = ALIGN (0x40)
+ *(.tohost)
+ .tohost        0x000083c0       0xc8 local_coremark_unified.o
+                0x000083c0                tohost
+                0x00008400                tohost_ready
+                0x00008440                fromhost_ready
+                0x00008480                fromhost
+                0x000084c0                        . = ALIGN (0x40)
+ *fill*         0x00008488       0x38 
+
+.rodata         0x000084c0      0x9a8
+ *(.rodata .rodata.*)
+ .rodata        0x000084c0      0x360 local_coremark_unified.o
+ .rodata.str1.4
+                0x00008820      0x50a local_coremark_unified.o
+                                0x506 (size before relaxing)
+ *fill*         0x00008d2a        0x2 
+ .rodata.__divdf3
+                0x00008d2c       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .rodata.__clz_tab
+                0x00008d68      0x100 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+                0x00008d68                __clz_tab
+
+.srodata.cst8   0x00008e68       0x20
+ .srodata.cst8  0x00008e68       0x20 local_coremark_unified.o
+                                 0x28 (size before relaxing)
+
+.srodata.cst4   0x00008e88       0x38
+ .srodata.cst4  0x00008e88       0x38 local_coremark_unified.o
+
+.rela.dyn       0x00008ec0        0x0
+ .rela.text.init
+                0x00008ec0        0x0 local_crt0.o
+ .rela.text     0x00008ec0        0x0 local_crt0.o
+
+.data           0x00008ec0       0x18
+ *(.data .data.*)
+ .data          0x00008ec0        0x0 local_crt0.o
+ .data          0x00008ec0        0xc local_coremark_unified.o
+                0x00008ec0                mem_name
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+ .data          0x00008ecc        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a(libc_a-memset.o)
+                0x00008ed0                        . = ALIGN (0x8)
+ *fill*         0x00008ecc        0x4 
+                0x000096d0                        PROVIDE (__global_pointer$ = (. + 0x800))
+ *(.sdata .sdata.*)
+ .sdata         0x00008ed0        0x8 local_coremark_unified.o
+                0x00008ed0                default_num_contexts
+                0x00008ed4                seed4_volatile
+
+.bss            0x00008f00   0x1e8c90
+                0x00008f00                        . = ALIGN (0x8)
+                0x00008f00                        PROVIDE (__BSS_START__ = .)
+                0x00008f00                        __bss_start = .
+ *(.sbss .sbss.*)
+ .sbss          0x00008f00       0x20 local_coremark_unified.o
+                0x00008f10                seed5_volatile
+                0x00008f14                seed3_volatile
+                0x00008f18                seed2_volatile
+                0x00008f1c                seed1_volatile
+ *(.bss .bss.*)
+ .bss           0x00008f20        0x0 local_crt0.o
+ *fill*         0x00008f20       0x20 
+ .bss           0x00008f40   0x1e8c50 local_coremark_unified.o
+                0x001f13c0                static_memblk
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+ .bss           0x001f1b90        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a(libc_a-memset.o)
+ *(COMMON)
+                0x001f1b90                        . = ALIGN (0x8)
+                0x001f1b90                        PROVIDE (__BSS_END__ = .)
+                0x001f1b90                        _end = .
+
+.heap           0x001f1b90   0x100000
+                0x001f1b90                        . = ALIGN (0x10)
+                0x001f1b90                        __heap_start = .
+                0x002f1b90                        . = (. + 0x100000)
+ *fill*         0x001f1b90   0x100000 
+                0x002f1b90                        __heap_end = .
+
+.stack          0x002f1b90   0x100000
+                0x002f1b90                        . = ALIGN (0x10)
+                0x003f1b90                        . = (. + 0x100000)
+ *fill*         0x002f1b90   0x100000 
+                0x003f1b90                        _stack_top = .
+OUTPUT(coremark_unified_tmp.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x6d
+ .riscv.attributes
+                0x00000000       0x6b local_crt0.o
+ .riscv.attributes
+                0x0000006b       0x6b local_coremark_unified.o
+ .riscv.attributes
+                0x000000d6       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .riscv.attributes
+                0x00000112       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .riscv.attributes
+                0x0000014e       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .riscv.attributes
+                0x0000018a       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .riscv.attributes
+                0x000001c6       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .riscv.attributes
+                0x00000202       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .riscv.attributes
+                0x0000023e       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .riscv.attributes
+                0x0000027a       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .riscv.attributes
+                0x000002b6       0x38 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .riscv.attributes
+                0x000002ee       0x38 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .riscv.attributes
+                0x00000326       0x3c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .riscv.attributes
+                0x00000362       0x38 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .riscv.attributes
+                0x0000039a       0x38 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+ .riscv.attributes
+                0x000003d2       0x36 /usr/lib/gcc/riscv-none-elf/15.2.0/../../../../riscv-none-elf/lib/rv32imf_zicsr/ilp32f/libc.a(libc_a-memset.o)
+
+.comment        0x00000000       0x1b
+ .comment       0x00000000       0x1b local_coremark_unified.o
+                                 0xa3 (size before relaxing)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .comment       0x0000001b       0x1c /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)
+
+.note.GNU-stack
+                0x00000000        0x0
+ .note.GNU-stack
+                0x00000000        0x0 local_coremark_unified.o
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(adddf3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(divdf3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(gedf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(ledf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(muldf3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(subdf3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixdfsi.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(fixunsdfsi.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatsidf.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(floatunsidf.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(extendsfdf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clzsi2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/lib/gcc/riscv-none-elf/15.2.0/rv32imf_zicsr/ilp32f/libgcc.a(_clz.o)

@@ -13,9 +13,10 @@
 # limitations under the License.
 
 # Build rules for CoralNPU simulator code.
-load("@com_google_mpact-sim//mpact/sim/decoder:mpact_sim_isa.bzl", "mpact_bin_fmt_decoder", "mpact_isa_decoder")
-# load("@rules_cc//cc:defs.bzl", "cc_binary")
-# load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@mpact-sim//mpact/sim/decoder:mpact_sim_isa.bzl", "mpact_bin_fmt_decoder", "mpact_isa_decoder")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -33,14 +34,14 @@ cc_library(
         "-fprotect-parens",
     ],
     deps = [
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -61,15 +62,15 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":coralnpu_state",
-        "@com_google_absl//absl/functional:bind_front",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/numeric:bits",
-        "@com_google_absl//absl/types:span",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:arch_state",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/numeric:bits",
+        "@abseil-cpp//absl/types:span",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
 )
 
@@ -82,14 +83,14 @@ mpact_isa_decoder(
         "coralnpu_memory.isa",
         "coralnpu_mul.isa",
         "coralnpu_shift.isa",
-        "@com_google_mpact-riscv//riscv:riscv32zb.isa",
+        "@mpact-riscv//riscv:riscv32zb.isa",
     ],
     isa_name = "CoralNPU",
     deps = [
         ":coralnpu_instructions",
-        "@com_google_absl//absl/functional:bind_front",
-        "@com_google_mpact-riscv//riscv:riscv_bitmanip_instructions",
-        "@com_google_mpact-riscv//riscv:riscv_g",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@mpact-riscv//riscv:riscv_bitmanip_instructions",
+        "@mpact-riscv//riscv:riscv_g",
     ],
 )
 
@@ -105,7 +106,7 @@ mpact_bin_fmt_decoder(
         "coralnpu_memory.bin_fmt",
         "coralnpu_mul.bin_fmt",
         "coralnpu_shift.bin_fmt",
-        "@com_google_mpact-riscv//riscv:riscv32zb.bin_fmt",
+        "@mpact-riscv//riscv:riscv32zb.bin_fmt",
     ],
     deps = [
         ":coralnpu_isa",
@@ -127,19 +128,19 @@ cc_library(
         ":coralnpu_bin_fmt",
         ":coralnpu_isa",
         ":coralnpu_state",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-        "@com_google_mpact-riscv//riscv:riscv_generic_decoder",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:arch_state",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:program_error",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@mpact-riscv//riscv:riscv_generic_decoder",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:program_error",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -160,28 +161,28 @@ cc_library(
         ":coralnpu_state",
         "//sim/proto:trace_cc_proto",
         "//sim/renode:coralnpu_renode_memory",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/functional:bind_front",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_mpact-riscv//riscv:riscv_arm_semihost",
-        "@com_google_mpact-riscv//riscv:riscv_fp_state",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:action_points",
-        "@com_google_mpact-sim//mpact/sim/generic:arch_state",
-        "@com_google_mpact-sim//mpact/sim/generic:component",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:core_debug_interface",
-        "@com_google_mpact-sim//mpact/sim/generic:counters",
-        "@com_google_mpact-sim//mpact/sim/generic:decode_cache",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
+        "@mpact-riscv//riscv:riscv_arm_semihost",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:action_points",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:component",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:core_debug_interface",
+        "@mpact-sim//mpact/sim/generic:counters",
+        "@mpact-sim//mpact/sim/generic:decode_cache",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -198,18 +199,18 @@ cc_binary(
     deps = [
         ":coralnpu_state",
         ":coralnpu_top",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:initialize",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/time",
-        "@com_google_mpact-riscv//riscv:debug_command_shell",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/util/program_loader:elf_loader",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/time",
         "@com_googlesource_code_re2//:re2",
+        "@mpact-riscv//riscv:debug_command_shell",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/util/program_loader:elf_loader",
     ],
 )
 
@@ -225,10 +226,10 @@ cc_library(
         "-O3",
     ],
     deps = [
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -236,17 +237,17 @@ mpact_isa_decoder(
     name = "coralnpu_v2_isa",
     src = "coralnpu_v2.isa",
     includes = [
-        "@com_google_mpact-riscv//riscv:riscv32g.isa",
-        "@com_google_mpact-riscv//riscv:riscv32zb.isa",
-        "@com_google_mpact-riscv//riscv:riscv_vector.isa",
+        "@mpact-riscv//riscv:riscv32g.isa",
+        "@mpact-riscv//riscv:riscv32zb.isa",
+        "@mpact-riscv//riscv:riscv_vector.isa",
     ],
     isa_name = "CoralNPUV2",
     deps = [
         ":coralnpu_v2_instructions",
-        "@com_google_absl//absl/functional:bind_front",
-        "@com_google_mpact-riscv//riscv:riscv_bitmanip_instructions",
-        "@com_google_mpact-riscv//riscv:riscv_g",
-        "@com_google_mpact-riscv//riscv:riscv_v",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@mpact-riscv//riscv:riscv_bitmanip_instructions",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_v",
     ],
 )
 
@@ -255,10 +256,10 @@ mpact_bin_fmt_decoder(
     src = "coralnpu_v2.bin_fmt",
     decoder_name = "CoralNPUV2",
     includes = [
-        "@com_google_mpact-riscv//riscv:riscv32g.bin_fmt",
-        "@com_google_mpact-riscv//riscv:riscv_format16.bin_fmt",
-        "@com_google_mpact-riscv//riscv:riscv_format32.bin_fmt",
-        "@com_google_mpact-riscv//riscv:riscv_vector.bin_fmt",
+        "@mpact-riscv//riscv:riscv32g.bin_fmt",
+        "@mpact-riscv//riscv:riscv_format16.bin_fmt",
+        "@mpact-riscv//riscv:riscv_format32.bin_fmt",
+        "@mpact-riscv//riscv:riscv_vector.bin_fmt",
     ],
     deps = [
         ":coralnpu_v2_isa",
@@ -271,11 +272,11 @@ cc_library(
     deps = [
         ":coralnpu_v2_getters",
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/base:nullability",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_mpact-riscv//riscv:riscv_encoding_common",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
+        "@abseil-cpp//absl/base:nullability",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@mpact-riscv//riscv:riscv_encoding_common",
+        "@mpact-sim//mpact/sim/generic:core",
     ],
 )
 
@@ -297,15 +298,15 @@ cc_library(
         ":coralnpu_v2_encoding_template",
         ":coralnpu_v2_isa",
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/base:nullability",
-        "@com_google_mpact-riscv//riscv:riscv_generic_decoder",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:arch_state",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:program_error",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/base:nullability",
+        "@mpact-riscv//riscv:riscv_generic_decoder",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:program_error",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -314,16 +315,16 @@ cc_library(
     hdrs = ["coralnpu_v2_getters.h"],
     copts = ["-O3"],
     deps = [
-        "@com_google_absl//absl/base:nullability",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_mpact-riscv//riscv:riscv_encoding_common",
-        "@com_google_mpact-riscv//riscv:riscv_getters",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/base:nullability",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@mpact-riscv//riscv:riscv_encoding_common",
+        "@mpact-riscv//riscv:riscv_getters",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
 )
 
@@ -338,14 +339,14 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/base:nullability",
-        "@com_google_absl//absl/types:span",
-        "@com_google_mpact-riscv//riscv:riscv_g",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-riscv//riscv:riscv_v",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/base:nullability",
+        "@abseil-cpp//absl/types:span",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_v",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
 )
 
@@ -362,26 +363,28 @@ cc_library(
     deps = [
         ":coralnpu_architecture",
         ":coralnpu_m3_user_decoder",
+        ":coralnpu_m4_user_decoder",
         ":coralnpu_v2_state",
         ":coralnpu_v2_user_decoder",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_github_serge1_elfio//:elfio",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_mpact-riscv//riscv:debug_command_shell",
-        "@com_google_mpact-riscv//riscv:riscv32_htif_semihost",
-        "@com_google_mpact-riscv//riscv:riscv_fp_state",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-riscv//riscv:riscv_top",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:core_debug_interface",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
-        "@com_google_mpact-sim//mpact/sim/util/program_loader:elf_loader",
+        "@mpact-riscv//riscv:debug_command_shell",
+        "@mpact-riscv//riscv:riscv32_htif_semihost",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_top",
+        "@mpact-riscv//riscv:riscv_zvt_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:core_debug_interface",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+        "@mpact-sim//mpact/sim/util/memory",
+        "@mpact-sim//mpact/sim/util/program_loader:elf_loader",
     ],
 )
 
@@ -392,17 +395,50 @@ cc_binary(
     deps = [
         ":coralnpu_simulator",
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:marshalling",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:initialize",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/time",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:marshalling",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/time",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m3_zfhmin_instructions",
+    srcs = ["coralnpu_m3_zfhmin_instructions.cc"],
+    hdrs = ["coralnpu_m3_zfhmin_instructions.h"],
+    copts = ["-Werror"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":coralnpu_state",
+        ":coralnpu_v2_state",
+        "@abseil-cpp//absl/base:nullability",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m3_zfbfmin_overrides",
+    srcs = ["coralnpu_m3_zfbfmin_overrides.cc"],
+    hdrs = ["coralnpu_m3_zfbfmin_overrides.h"],
+    copts = ["-Werror"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":coralnpu_v2_state",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/strings",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
 )
 
@@ -411,15 +447,19 @@ mpact_isa_decoder(
     src = "coralnpu_m3.isa",
     includes = [
         "coralnpu_v2.isa",
+        "@mpact-riscv//riscv:riscv_zvt.isa",
     ],
     isa_name = "CoralNPUM3",
     deps = [
+        ":coralnpu_m3_zfbfmin_overrides",
+        ":coralnpu_m3_zfhmin_instructions",
         ":coralnpu_v2_instructions",
         ":coralnpu_v2_isa",
-        "@com_google_absl//absl/functional:bind_front",
-        "@com_google_mpact-riscv//riscv:riscv_bitmanip_instructions",
-        "@com_google_mpact-riscv//riscv:riscv_g",
-        "@com_google_mpact-riscv//riscv:riscv_v",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@mpact-riscv//riscv:riscv_bitmanip_instructions",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_v",
+        "@mpact-riscv//riscv:riscv_zfh_instructions",
     ],
 )
 
@@ -430,6 +470,7 @@ mpact_bin_fmt_decoder(
     includes = [
         "coralnpu_m3_decoder.h",
         "coralnpu_v2.bin_fmt",
+        "@mpact-riscv//riscv:riscv_zvt.bin_fmt",
     ],
     deps = [
         ":coralnpu_m3_isa",
@@ -453,14 +494,58 @@ cc_library(
         ":coralnpu_m3_isa",
         ":coralnpu_v2_encoding_template",
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/base:nullability",
-        "@com_google_mpact-riscv//riscv:riscv_generic_decoder",
-        "@com_google_mpact-riscv//riscv:riscv_state",
-        "@com_google_mpact-sim//mpact/sim/generic:arch_state",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:program_error",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/base:nullability",
+        "@mpact-riscv//riscv:riscv_generic_decoder",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:program_error",
+        "@mpact-sim//mpact/sim/util/memory",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m3_assembler_lib",
+    srcs = [
+        "coralnpu_m3_assembler.cc",
+        "coralnpu_m3_bin_encoder_interface.cc",
+    ],
+    hdrs = [
+        "coralnpu_m3_assembler.h",
+        "coralnpu_m3_bin_encoder_interface.h",
+    ],
+    deps = [
+        ":coralnpu_m3_bin_fmt",
+        ":coralnpu_m3_isa",
+        "@abseil-cpp//absl/base:no_destructor",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@com_googlesource_code_re2//:re2",
+        "@mpact-sim//mpact/sim/util/asm",
+    ],
+)
+
+cc_binary(
+    name = "coralnpu_m3_as",
+    srcs = ["coralnpu_m3_as_main.cc"],
+    deps = [
+        ":coralnpu_m3_assembler_lib",
+        ":coralnpu_m3_isa",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@com_github_serge1_elfio//:elfio",
+        "@mpact-sim//mpact/sim/util/asm:simple_assembler",
     ],
 )
 
@@ -472,16 +557,562 @@ cc_binary(
         ":coralnpu_architecture",
         ":coralnpu_simulator",
         ":coralnpu_v2_state",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:marshalling",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:initialize",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/time",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:marshalling",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/time",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+    ],
+)
+
+mpact_isa_decoder(
+    name = "coralnpu_m4_isa",
+    src = "coralnpu_m4.isa",
+    includes = [
+        "coralnpu_m3.isa",
+        "coralnpu_m4_instructions.h",
+        "coralnpu_v2.isa",
+        "@mpact-riscv//riscv:riscv_zvt.isa",
+    ],
+    isa_name = "CoralNPUM4",
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coralnpu_m4_instructions",
+        ":coralnpu_v2_instructions",
+        ":coralnpu_v2_isa",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@mpact-riscv//riscv:riscv_bitmanip_instructions",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_v",
+        "@mpact-riscv//riscv:riscv_zvt_instructions",
+    ],
+)
+
+mpact_bin_fmt_decoder(
+    name = "coralnpu_m4_bin_fmt",
+    src = "coralnpu_m4.bin_fmt",
+    decoder_name = "CoralNPUM4",
+    includes = [
+        "coralnpu_m3.bin_fmt",
+        "coralnpu_m4_decoder.h",
+        "coralnpu_v2.bin_fmt",
+        "@mpact-riscv//riscv:riscv_zvt.bin_fmt",
+    ],
+    deps = [
+        ":coralnpu_m3_bin_fmt",
+        ":coralnpu_m4_isa",
+        ":coralnpu_v2_bin_fmt",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m4_user_decoder",
+    srcs = [
+        "coralnpu_m4_encoding.cc",
+        "coralnpu_m4_user_decoder.cc",
+    ],
+    hdrs = [
+        "coralnpu_m4_encoding.h",
+        "coralnpu_m4_user_decoder.h",
+    ],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_m4_bin_fmt",
+        ":coralnpu_m4_isa",
+        ":coralnpu_v2_encoding_template",
+        ":coralnpu_v2_state",
+        "@abseil-cpp//absl/base:nullability",
+        "@mpact-riscv//riscv:riscv_generic_decoder",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_zvt_getters",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:program_error",
+        "@mpact-sim//mpact/sim/util/memory",
+    ],
+)
+
+cc_binary(
+    name = "coralnpu_m4_sim",
+    srcs = ["coralnpu_m4_sim.cc"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_architecture",
+        ":coralnpu_simulator",
+        ":coralnpu_v2_state",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:marshalling",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/time",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m4_instructions",
+    srcs = ["coralnpu_m4_instructions.cc"],
+    hdrs = ["coralnpu_m4_instructions.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_v2_state",
+        "@abseil-cpp//absl/log:check",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_zvt_instructions",
+        "@mpact-riscv//riscv:riscv_zvt_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+    ],
+)
+
+cc_library(
+    name = "memory_config",
+    hdrs = ["memory_config.h"],
+    deps = [
+        ":coralnpu_v2_state",
+    ],
+)
+
+cc_library(
+    name = "isg_engine",
+    srcs = ["isg/isg_engine.cc"],
+    hdrs = ["isg/isg_engine.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coralnpu_m3_user_decoder",
+        ":coralnpu_v2_state",
+        ":isg_watchdog",
+        ":memory_config",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/base:no_destructor",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:protobuf_lite",
+        "@mpact-sim//mpact/sim/util/memory",
+    ],
+)
+
+cc_library(
+    name = "isg_watchdog",
+    srcs = ["isg/isg_watchdog.cc"],
+    hdrs = ["isg/isg_watchdog.h"],
+    copts = ["-O3"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
+    ],
+)
+
+cc_test(
+    name = "isg_engine_test",
+    srcs = ["isg/isg_engine_test.cc"],
+    copts = ["-O3"],
+    data = [":coralnpu_m3_as"],
+    deps = [
+        ":coralnpu_simulator",
+        ":isg_engine",
+        "@abseil-cpp//absl/status:status_matchers",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "coverage_summary",
+    hdrs = ["coverage_summary.h"],
+    copts = ["-O3"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "fuzzer_types",
+    hdrs = ["fuzzer_types.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coverage_summary",
+        "@abseil-cpp//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "coverage_detector",
+    hdrs = ["isg/coverage_detector.h"],
+    copts = ["-O3"],
+    deps = [
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_library(
+    name = "coverage_event_router",
+    hdrs = ["isg/coverage_event_router.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coverage_detector",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_library(
+    name = "execution_tracker",
+    srcs = ["execution_tracker.cc"],
+    hdrs = ["execution_tracker.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coverage_detector",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_library(
+    name = "hazard_generator",
+    srcs = ["isg/hazard_generator.cc"],
+    hdrs = ["isg/hazard_generator.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coralnpu_m3_user_decoder",
+        ":coralnpu_v2_state",
+        ":isg_engine",
+        ":memory_config",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/util/memory",
+    ],
+)
+
+cc_library(
+    name = "behavioral_archive",
+    srcs = ["behavioral_archive.cc"],
+    hdrs = ["behavioral_archive.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coverage_summary",
+        ":fuzzer_types",
+        ":isg_engine",
+        "@abseil-cpp//absl/container:flat_hash_map",
+    ],
+)
+
+cc_test(
+    name = "behavioral_archive_test",
+    srcs = ["behavioral_archive_test.cc"],
+    deps = [
+        ":behavioral_archive",
+        ":coverage_summary",
+        "//sim/proto:isg_database_cc_proto",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "random_simulator",
+    srcs = ["random_simulator.cc"],
+    hdrs = ["random_simulator.h"],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_architecture",
+        ":coralnpu_m3_assembler_lib",
+        ":coralnpu_m3_isa",
+        ":coralnpu_simulator",
+        ":coverage_event_router",
+        ":execution_tracker",
+        ":fuzzer_types",
+        ":isg_engine",
+        ":memory_config",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@com_github_serge1_elfio//:elfio",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/util/asm:simple_assembler",
+    ],
+)
+
+cc_library(
+    name = "orchestrator",
+    srcs = ["orchestrator.cc"],
+    hdrs = ["orchestrator.h"],
+    copts = ["-O3"],
+    deps = [
+        ":behavioral_archive",
+        ":fuzzer_types",
+        ":isg_engine",
+        ":random_simulator",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_binary(
+    name = "coralnpu_random_sim",
+    srcs = ["coralnpu_random_sim.cc"],
+    copts = ["-O3"],
+    deps = [
+        ":orchestrator",
+        ":random_simulator",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/time",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_test(
+    name = "isg_database_parsing_test",
+    srcs = ["isg/isg_database_parsing_test.cc"],
+    data = [":coralnpu_random_sim"],
+    deps = [
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "random_simulator_test",
+    srcs = ["random_simulator_test.cc"],
+    deps = [
+        ":random_simulator",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_database_export_test",
+    srcs = ["isg/isg_database_export_test.cc"],
+    data = [
+        ":coralnpu_random_sim",
+    ],
+    deps = [
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_e2e_test",
+    srcs = ["isg/isg_e2e_test.cc"],
+    data = [
+        ":coralnpu_m3_as",
+    ],
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coralnpu_simulator",
+        ":coverage_event_router",
+        ":execution_tracker",
+        ":hazard_generator",
+        ":isg_engine",
+        ":memory_config",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_matchers",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_top",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_test(
+    name = "isg_integration_test",
+    srcs = ["isg/isg_integration_test.cc"],
+    data = [
+        ":coralnpu_m3_as",
+        ":coralnpu_m3_sim",
+    ],
+    tags = ["no_heapcheck"],
+    deps = [
+        ":coralnpu_m3_isa",
+        ":coralnpu_simulator",
+        ":coverage_event_router",
+        ":execution_tracker",
+        ":isg_engine",
+        ":memory_config",
+        "@abseil-cpp//absl/debugging:leak_check",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_test(
+    name = "isg_fp_poison_pill_test",
+    srcs = ["isg/isg_fp_poison_pill_test.cc"],
+    data = [
+        ":coralnpu_m3_as",
+    ],
+    deps = [
+        ":coralnpu_simulator",
+        ":coverage_event_router",
+        ":execution_tracker",
+        ":isg_engine",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "orchestrator_test",
+    srcs = ["orchestrator_test.cc"],
+    data = [
+        ":coralnpu_m3_as",
+    ],
+    deps = [
+        ":isg_engine",
+        ":memory_config",
+        ":orchestrator",
+        ":random_simulator",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_watchdog_test",
+    srcs = ["isg/isg_watchdog_test.cc"],
+    deps = [
+        ":isg_watchdog",
+        "@abseil-cpp//absl/status",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_database_test",
+    srcs = ["isg/isg_database_test.cc"],
+    deps = [
+        ":coverage_summary",
+        ":fuzzer_types",
+        ":isg_database",
+        "//sim/proto:isg_database_cc_proto",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_toolchain_test",
+    srcs = ["isg/isg_toolchain_test.cc"],
+    data = ["@mpact-riscv//riscv:riscv64g_as"],
+    deps = [
+        ":isg_engine",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_database_integration_test",
+    srcs = ["isg/isg_database_integration_test.cc"],
+    deps = [
+        ":isg_engine",
+        "//sim/proto:isg_database_cc_proto",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "isg_mutator_test",
+    srcs = ["isg/isg_mutator_test.cc"],
+    deps = [
+        ":isg_engine",
+        ":isg_mutator",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/random",
+        "@abseil-cpp//absl/strings:string_view",
+        "@com_google_googletest//:gtest_main",
+        "@mpact-sim//mpact/sim/generic:core",
+    ],
+)
+
+cc_test(
+    name = "coverage_event_router_test",
+    srcs = ["isg/coverage_event_router_test.cc"],
+    deps = [
+        ":coverage_event_router",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "hazard_generator_test",
+    srcs = ["isg/hazard_generator_test.cc"],
+    deps = [
+        ":hazard_generator",
+        ":isg_engine",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "isg_database",
+    hdrs = ["isg/isg_database.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":coverage_summary",
+        ":fuzzer_types",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/container:flat_hash_set",
+    ],
+)
+
+cc_library(
+    name = "isg_mutator",
+    hdrs = ["isg/isg_mutator.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":coralnpu_m3_user_decoder",
+        ":coralnpu_v2_state",
+        ":isg_engine",
+        ":memory_config",
+        "//sim/proto:isg_database_cc_proto",
+        "@abseil-cpp//absl/random",
+        "@abseil-cpp//absl/status",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )

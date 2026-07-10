@@ -13,10 +13,10 @@
 // limitations under the License.
 
 includes {
-  #include "external/com_google_mpact-riscv/riscv/riscv_vector_fp_instructions.h"
-  #include "external/com_google_mpact-riscv/riscv/riscv_vector_fp_unary_instructions.h"
-  #include "external/com_google_mpact-riscv/riscv/riscv_vector_fp_reduction_instructions.h"
-  #include "external/com_google_mpact-riscv/riscv/riscv_vector_fp_compare_instructions.h"
+  #include "riscv/riscv_vector_fp_instructions.h"
+  #include "riscv/riscv_vector_fp_unary_instructions.h"
+  #include "riscv/riscv_vector_fp_reduction_instructions.h"
+  #include "riscv/riscv_vector_fp_compare_instructions.h"
 }
 
 isa CoralNPUM3 {

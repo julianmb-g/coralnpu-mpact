@@ -27,7 +27,7 @@
 #include <cstdint>
 
 #include "sim/coralnpu_architecture.h"
-#include "external/svdpi_h_file/file/svdpi.h"
+#include "third_party/verilator/svdpi.h"
 
 typedef struct {
   uint32_t itcm_start_address;  // Start address of the ITCM range.

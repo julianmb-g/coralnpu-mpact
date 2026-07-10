@@ -15,7 +15,7 @@
 # This project contains a small set of tests to test the functionality of
 # the MPACT-Sim/Renode interface.
 
-# load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
     name = "renode_mpact_test",
@@ -29,10 +29,10 @@ cc_test(
     deps = [
         "//sim/renode:coralnpu_renode",
         "//sim/renode:renode_mpact",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/strings",
         "@com_google_googletest//:gtest_main",
-        "@com_google_mpact-riscv//riscv:riscv_debug_info",
+        "@mpact-riscv//riscv:riscv_debug_info",
     ],
 )
 
@@ -49,12 +49,12 @@ cc_test(
         "//sim:coralnpu_top",
         "//sim/renode:coralnpu_renode",
         "//sim/renode:renode_debug_interface",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@com_google_googletest//:gtest_main",
-        "@com_google_mpact-riscv//riscv:riscv_debug_info",
-        "@com_google_mpact-sim//mpact/sim/generic:core_debug_interface",
-        "@com_google_mpact-sim//mpact/sim/util/program_loader:elf_loader",
+        "@mpact-riscv//riscv:riscv_debug_info",
+        "@mpact-sim//mpact/sim/generic:core_debug_interface",
+        "@mpact-sim//mpact/sim/util/program_loader:elf_loader",
     ],
 )

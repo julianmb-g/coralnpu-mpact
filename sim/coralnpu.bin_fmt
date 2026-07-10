@@ -23,4 +23,4 @@ decoder CoralNPU {
 #include "coralnpu_memory.bin_fmt"
 #include "coralnpu_mul.bin_fmt"
 #include "coralnpu_shift.bin_fmt"
-#include "external/com_google_mpact-riscv/riscv/riscv32zb.bin_fmt"
+#include "riscv/riscv32zb.bin_fmt"

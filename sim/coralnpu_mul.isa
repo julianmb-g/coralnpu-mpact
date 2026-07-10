@@ -2,7 +2,7 @@
 // format, check: go/mpact-sim-codelabs-riscv-instruction-decoder
 
 // First disasm field is 18 char wide and left justified.
-disasm widths = {-18};
+
 
 // CoralNPU simd instructions:
 // https://opensecura.googlesource.com/sw/kelvin/+/master/docs/coralnpu_isa.md

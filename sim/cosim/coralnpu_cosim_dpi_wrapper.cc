@@ -26,7 +26,7 @@
 #include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "mpact/sim/generic/data_buffer.h"
-#include "external/svdpi_h_file/file/svdpi.h"
+#include "third_party/verilator/svdpi.h"
 
 using ::coralnpu::sim::Architecture;
 using ::coralnpu::sim::CoralNPUSimulator;
