@@ -1,0 +1,57 @@
+module(
+    name = "coralnpu_sim",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.0.9")
+# Rationale: Version 20260526.0 of abseil-cpp is explicitly pinned to resolve transitive dependency conflicts. This specific version ensures compatibility with the latest API surfaces expected by both mpact-sim and mpact-riscv, stabilizing our external build graph against implicit regressions.
+bazel_dep(name = "abseil-cpp", version = "20260526.0")
+bazel_dep(name = "protobuf", version = "35.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1", repo_name = "com_google_googletest")
+bazel_dep(name = "re2", version = "2024-06-01", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "antlr4-cpp-runtime", version = "4.13.2.bcr.2", repo_name = "org_antlr4_cpp_runtime")
+
+bazel_dep(name = "mpact-sim", version = "0.0.0")
+
+bazel_dep(name = "mpact-riscv", version = "0.0.0")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_archive(
+    name = "svdpi_h_file",
+    build_file_content = """load("@rules_cc//cc:defs.bzl", "cc_library")
+cc_library(
+    name = "svdpi",
+    hdrs = ["include/vltstd/svdpi.h"],
+    strip_include_prefix = "include/vltstd",
+    include_prefix = "third_party/verilator",
+    visibility = ["//visibility:public"],
+)
+""",
+    strip_prefix = "verilator-5.028",
+    urls = ["https://github.com/verilator/verilator/archive/refs/tags/v5.028.tar.gz"],
+)
+
+http_file(
+    name = "cc_static_library_external",
+    downloaded_file_path = "cc_static_library.bzl",
+    sha256 = "1287ce9f7e5fe31ad1b5937781531e4ab3f4656edabf650cca9ca720ceb31806",
+    urls = ["https://raw.githubusercontent.com/project-oak/oak/fcceea755f0274d3a0eb7c0461b30af3dc28e40a/cc/build_defs.bzl"],
+)
+
+http_archive(
+    name = "com_github_serge1_elfio",
+    build_file_content = """load("@rules_cc//cc:defs.bzl", "cc_library")
+cc_library(
+    name = "elfio",
+    hdrs = glob(["elfio/**/*.hpp"]),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+    strip_prefix = "ELFIO-Release_3.12",
+    urls = ["https://github.com/serge1/ELFIO/archive/refs/tags/Release_3.12.tar.gz"],
+)
+
+bazel_dep(name = "rules_shell", version = "0.2.0")

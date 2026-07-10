@@ -23,7 +23,7 @@
 #include "googletest/include/gtest/gtest.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_format.h"
-#include "external/svdpi_h_file/file/svdpi.h"
+#include "third_party/verilator/svdpi.h"
 
 namespace {
 

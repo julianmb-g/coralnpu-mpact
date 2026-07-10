@@ -2,12 +2,12 @@
 // isa format, check: go/mpact-sim-codelabs-riscv-instruction-decoder
 
 // First disasm field is 18 char wide and left justified.
-disasm widths = {-18};
+
 
 // Basic integer ALU instructions, part of the RiscV 32i subset.
 slot riscv32i {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_i_instructions.h"
+    #include "riscv/riscv_i_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -52,7 +52,7 @@ slot riscv32i {
       semfunc: "&mpact::sim::riscv::RV32::RiscVISll";
     srli{: rs1, I_uimm5 : rd},
       resources: TwoOp,
-      disasm: "srli", "%rd  %rs1, 0x%(I_uimm5:x)",
+      disasm: "srli", "%rd, %rs1, 0x%(I_uimm5:x)",
       semfunc: "&mpact::sim::riscv::RV32::RiscVISrl";
     srai{: rs1, I_uimm5 : rd},
       resources: TwoOp,
@@ -64,7 +64,7 @@ slot riscv32i {
       semfunc: "&mpact::sim::riscv::RV32::RiscVILui";
     auipc{: U_imm20 : rd},
       resources: { next_pc : rd[0..]},
-      disasm: "auipc", "%rd, 0x%(U_imm20:08x)",
+      disasm: "auipc %rd, 0x%(U_imm20:08x)",
       semfunc: "&mpact::sim::riscv::RV32::RiscVIAuipc";
     add{: rs1, rs2 : rd},
       resources: ThreeOp,
@@ -114,7 +114,7 @@ slot riscv32i {
       semfunc: "&mpact::sim::riscv::RiscVINop";
     jal{: J_imm20 : next_pc, rd},
       resources: { next_pc : next_pc[0..], rd[0..]},
-      disasm: "jal", "%rd, %(@+J_imm20:08x)",
+      disasm: "jal %rd, %(@+J_imm20:08x)",
       semfunc: "&mpact::sim::riscv::RV32::RiscVIJal";
     jalr{: rs1, J_imm12 : next_pc, rd},
       resources: { next_pc, rs1 : next_pc[0..], rd[0..]},
@@ -203,7 +203,7 @@ slot riscv32i {
 // RiscV32 multiply/divide instructions.
 slot riscv32m {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_m_instructions.h"
+    #include "riscv/riscv_m_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -247,7 +247,7 @@ slot riscv32m {
 // RiscV32 CSR manipulation instructions.
 slot zicsr {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_zicsr_instructions.h"
+    #include "riscv/riscv_zicsr_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -255,74 +255,74 @@ slot zicsr {
     csrrw{: rs1, csr : rd, csr},
       resources: { next_pc, rs1, csr : rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrw",
-      disasm: "csrw", "%rd, %csr, %rs1";
+      disasm: "csrw %rd, %csr, %rs1";
     csrrs{: rs1, csr : rd, csr},
       resources: { next_pc, rs1, csr : rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrs",
-      disasm: "csrs", "%rd, %csr, %rs1";
+      disasm: "csrs %rd, %csr, %rs1";
     csrrc{: rs1, csr : rd, csr},
       resources: { next_pc, rs1, csr : rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrc",
-      disasm: "csrc", "%rd, %csr, %rs1";
+      disasm: "csrc %rd, %csr, %rs1";
     csrrs_nr{: rs1, csr : rd, csr},
       resources: { next_pc, rs1, csr : rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrs",
-      disasm: "csrs", "%csr, %rs1";
+      disasm: "csrs %csr, %rs1";
     csrrc_nr{: rs1, csr : rd, csr},
       resources: { next_pc, rs1, csr : rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrc",
-      disasm: "csrc", "%csr, %rs1";
+      disasm: "csrc %csr, %rs1";
     csrrw_nr{: rs1, csr : csr},
       resources: { next_pc, rs1: csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrwNr", // rd == 0 (x0).
-      disasm: "csrw", "%csr, %rs1";
+      disasm: "csrw %csr, %rs1";
     csrrs_nw{: csr : rd},
       resources: { next_pc, csr: rd[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrNw", // rs1 == 0 (x0).
-      disasm: "csrs", "%rd, %csr";
+      disasm: "csrs %rd, %csr";
     csrrc_nw{: csr : rd},
       resources: { next_pc, csr: rd[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrNw", // rs1 == 0 (x0).
-      disasm: "csrc", "%rd, %csr";
+      disasm: "csrc %rd, %csr";
     csrrwi{: CSR_uimm5, csr : rd, csr},
       resources: { next_pc, csr: rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrw",
-      disasm: "csrwi", "%rd, %csr, %CSR_uimm5";
+      disasm: "csrwi %rd, %csr, %CSR_uimm5";
     csrrsi{: CSR_uimm5, csr : rd, csr},
       resources: { next_pc, csr: rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrs",
-      disasm: "csrsi", "%rd, %csr, %CSR_uimm5";
+      disasm: "csrsi %rd, %csr, %CSR_uimm5";
     csrrci{: CSR_uimm5, csr : rd, csr},
       resources: { next_pc, csr: rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrc",
-      disasm: "csrci", "%rd, %csr, %CSR_uimm5";
+      disasm: "csrci %rd, %csr, %CSR_uimm5";
     csrrsi_nr{: CSR_uimm5, csr : rd, csr},
       resources: { next_pc, csr: rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrs",
-      disasm: "csrsi", "%csr, %CSR_uimm5";
+      disasm: "csrsi %csr, %CSR_uimm5";
     csrrci_nr{: CSR_uimm5, csr : rd, csr},
       resources: { next_pc, csr: rd[0..], csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrc",
-      disasm: "csrci", "%csr, %CSR_uimm5";
+      disasm: "csrci %csr, %CSR_uimm5";
     csrrwi_nr{: CSR_uimm5, csr : csr},
       resources: { next_pc : csr[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrwNr",  // rd == 0 (x0).
-      disasm: "csrrwi", "%csr, %CSR_uimm5";
+      disasm: "csrrwi %csr, %CSR_uimm5";
     csrrsi_nw{: csr : rd},
       resources: { next_pc, csr : rd[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrNw", // uimm5 == 0.
-      disasm: "csrsi", "%rd, %csr, 0";
+      disasm: "csrsi.nw %rd, %csr";
     csrrci_nw{: csr : rd},
       resources: { next_pc, csr : rd[0..]},
       semfunc: "&mpact::sim::riscv::RV32::RiscVZiCsrrNw", // uimm5 == 0.
-      disasm: "csrwi", "%rd, %csr, 0";
+      disasm: "csrci.nw %rd, %csr";
   }
 }
 
 // Instruction fence.
 slot zfencei {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_zfencei_instructions.h"
+    #include "riscv/riscv_zfencei_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -336,7 +336,7 @@ slot zfencei {
 // Privileged instructions.
 slot privileged {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_priv_instructions.h"
+    #include "riscv/riscv_priv_instructions.h"
     #include "sim/coralnpu_instructions.h"
   }
   default size = 4;

@@ -68,7 +68,7 @@ python_register_toolchains(
 
 http_file(
     name = "cc_static_library_external",
-    downloaded_file_path = "cc_static_libarary.bzl",
+    downloaded_file_path = "cc_static_library.bzl",
     sha256 = "1287ce9f7e5fe31ad1b5937781531e4ab3f4656edabf650cca9ca720ceb31806",
     urls = ["https://raw.githubusercontent.com/project-oak/oak/fcceea755f0274d3a0eb7c0461b30af3dc28e40a/cc/build_defs.bzl"],
 )

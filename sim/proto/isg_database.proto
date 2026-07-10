@@ -1,0 +1,56 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+edition = "2024";
+
+package coralnpu.sim.proto;
+
+option features.utf8_validation = NONE;
+
+message TerminalState {
+  uint32 pc = 1;
+  uint64 cycles = 2;
+  map<string, uint32> registers = 3;
+  map<string, bytes> vector_registers = 5;
+}
+
+message MemoryDump {
+  map<uint32, bytes> memory_blobs = 1;
+}
+
+message TrapEvent {
+  uint64 mcause = 1;
+  uint64 mepc = 2;
+  uint64 mtval = 3;
+}
+
+message TestSequence {
+  uint64 prng_seed = 1;
+  string assembly_text = 2;
+  bytes itcm_binary = 3;
+  TerminalState terminal_state = 4;
+  TrapEvent trap_event = 5;
+  repeated string hazard_tags = 6;
+  string expected_terminal_state = 7;
+  uint32 assertion_count = 8;
+  uint32 mutable_start = 9;
+  uint32 mutable_end = 10;
+  MemoryDump memory_dump = 11;
+}
+
+message Database {
+  uint64 master_seed = 1;
+  uint64 execution_limit = 2;
+  repeated TestSequence test_sequences = 3;
+}

@@ -14,8 +14,8 @@
 
 # Protobuf for the coralnpu sim trace file
 
-# load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
-# load("@com_google_protobuf//:protobuf.bzl", "proto_library")
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -30,5 +30,19 @@ cc_proto_library(
     name = "trace_cc_proto",
     deps = [
         ":trace_proto",
+    ],
+)
+
+proto_library(
+    name = "isg_database_proto",
+    srcs = [
+        "isg_database.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "isg_database_cc_proto",
+    deps = [
+        ":isg_database_proto",
     ],
 )

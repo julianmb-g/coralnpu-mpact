@@ -2,7 +2,7 @@
 // format, check: go/mpact-sim-codelabs-riscv-instruction-decoder
 
 // First disasm field is 18 char wide and left justified.
-disasm widths = {-18};
+
 
 int global_latency = 0;
 
@@ -16,7 +16,7 @@ isa CoralNPU {
 #include "coralnpu_shift.isa"
 #include "coralnpu_memory.isa"
 #include "coralnpu_mul.isa"
-#include "external/com_google_mpact-riscv/riscv/riscv32zb.isa"
+#include "riscv/riscv32zb.isa"
 
 // Combining all coralnpu instruction sets.
 slot coralnpu : riscv32i, riscv32m, zicsr, zfencei, privileged, coralnpu_arith,

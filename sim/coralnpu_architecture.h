@@ -22,6 +22,7 @@ extern "C" {
 typedef enum {
   kCoralNPUV2 = 0,
   kCoralNPUM3 = 1,
+  kCoralNPUM4 = 2,
 } coralnpu_architecture_t;
 
 #ifdef __cplusplus
@@ -31,6 +32,7 @@ namespace coralnpu::sim {
 enum class Architecture {
   kV2 = kCoralNPUV2,
   kM3 = kCoralNPUM3,
+  kM4 = kCoralNPUM4,
 };
 }  // namespace coralnpu::sim
 #endif
