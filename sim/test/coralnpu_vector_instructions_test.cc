@@ -17,6 +17,7 @@
 #include <assert.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -30,6 +31,9 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "riscv/riscv_register.h"
+#include "riscv/riscv_state.h"
+#include "riscv/riscv_vector_state.h"
 #include "mpact/sim/generic/instruction.h"
 
 // This file contains the tests for testing coralnpu vector binary instructions.
@@ -688,7 +692,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VPsubu) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VHaddOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       return static_cast<Vd>(
           (static_cast<int64_t>(vs1) + static_cast<int64_t>(vs2)) >> 1);
     }
@@ -713,7 +717,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VHaddu) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VHaddrOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       return static_cast<Vd>(
           (static_cast<int64_t>(vs1) + static_cast<int64_t>(vs2) + 1) >> 1);
     }
@@ -738,7 +742,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VHaddur) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VHsubOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       return static_cast<Vd>(
           (static_cast<int64_t>(vs1) - static_cast<int64_t>(vs2)) >> 1);
     }
@@ -763,7 +767,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VHsubu) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VHsubrOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       return static_cast<Vd>(
           (static_cast<int64_t>(vs1) - static_cast<int64_t>(vs2) + 1) >> 1);
     }
@@ -964,7 +968,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VMvp) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VShiftOp {
   static Vd Op(bool round, Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd> == true) {
+    if (std::is_signed<Vd>::value == true) {
       constexpr int kMaxShiftBit = sizeof(Vd) * 8;
       int shamt = 0;
       if (sizeof(Vd) == 1) shamt = static_cast<int8_t>(vs2);
@@ -1010,7 +1014,7 @@ struct VShiftOp {
           (static_cast<uint64_t>(vs1) + (round ? (1ull << (shamt - 1)) : 0)) >>
           shamt;
     } else {
-      using UT = std::make_unsigned_t<Vd>;
+      using UT = typename std::make_unsigned<Vd>::type;
       UT ushamt =
           static_cast<UT>(-shamt <= kMaxShiftBit ? -shamt : kMaxShiftBit);
       shift = static_cast<uint64_t>(vs1) << (ushamt);
@@ -1197,7 +1201,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VSraqsr) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VMulOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       return static_cast<Vd>(static_cast<int64_t>(vs1) *
                              static_cast<int64_t>(vs2));
     }
@@ -1217,7 +1221,7 @@ TEST_F(CoralNPUVectorInstructionsTest, VMul) {
 template <typename Vd, typename Vs1, typename Vs2>
 struct VMulsOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
-    if (std::is_signed_v<Vd>) {
+    if (std::is_signed<Vd>::value) {
       int64_t m = static_cast<int64_t>(vs1) * static_cast<int64_t>(vs2);
       m = std::max(
           static_cast<int64_t>(std::numeric_limits<Vd>::min()),
@@ -1268,7 +1272,7 @@ template <typename Vd, typename Vs1, typename Vs2>
 struct VMulhOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
     constexpr int n = sizeof(Vd) * 8;
-    if (std::is_signed_v<Vs1>) {
+    if (std::is_signed<Vs1>::value) {
       int64_t result = static_cast<int64_t>(vs1) * static_cast<int64_t>(vs2);
       return static_cast<uint64_t>(result) >> n;
     }
@@ -1295,7 +1299,7 @@ template <typename Vd, typename Vs1, typename Vs2>
 struct VMulhrOp {
   static Vd Op(Vs1 vs1, Vs2 vs2) {
     constexpr int n = sizeof(Vd) * 8;
-    if (std::is_signed_v<Vs1>) {
+    if (std::is_signed<Vs1>::value) {
       int64_t result = static_cast<int64_t>(vs1) * static_cast<int64_t>(vs2);
       result += 1ll << (n - 1);
       return static_cast<uint64_t>(result) >> n;
@@ -1671,6 +1675,180 @@ struct VZipOp {
 };
 TEST_F(CoralNPUVectorInstructionsTest, VZip) {
   CoralNPUShuffleOpHelper<VZipOp, int8_t, int16_t, int32_t>("VZip", kWidenDst);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, ZvfbfminOverlapTraps) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+
+  struct TestCase {
+    bool is_widening;
+    int src_reg;
+    int dest_reg;
+    bool has_mask;
+    bool expected_trap;
+  } cases[] = {
+      // Mask overlap (narrowing & widening)
+      {false, 8, 0, true, true},
+      {true, 8, 0, true, true},
+      // Widening source/destination overlap
+      {true, 9, 8, false, true},   // illegal (vd=v8 uses v8,v9; vs2=v9)
+      {true, 8, 8, false, false},  // legal (vd=v8 uses v8,v9; vs2=v8)
+      // Narrowing source/destination overlap
+      {false, 8, 9, false, true},   // illegal (vd=v9; vs2=v8,v9)
+      {false, 8, 8, false, false},  // legal (vd=v8; vs2=v8,v9)
+  };
+
+  for (const auto& tc : cases) {
+    auto instruction = CreateInstruction();
+    instruction->set_semantic_function(tc.is_widening
+                                           ? coralnpu::sim::Vfwcvtbf16ffv
+                                           : coralnpu::sim::Vfncvtbf16ffw);
+    AppendVectorRegisterOperands(instruction.get(), /*num_ops=*/1,
+                                 /*src1_widen_factor=*/tc.is_widening ? 1 : 2,
+                                 /*src1_reg=*/tc.src_reg,
+                                 /*other_sources=*/tc.has_mask
+                                     ? std::vector<int>{0}
+                                     : std::vector<int>{},
+                                 /*widen_dst=*/tc.is_widening,
+                                 /*destinations=*/{tc.dest_reg});
+
+    bool was_trap_handler_called = false;
+    state_->set_on_trap([&was_trap_handler_called](bool, uint64_t, uint64_t,
+                                                   uint64_t,
+                                                   const Instruction*) {
+      was_trap_handler_called = true;
+      return true;
+    });
+
+    instruction->Execute();
+    EXPECT_EQ(was_trap_handler_called, tc.expected_trap)
+        << "is_widening: " << tc.is_widening << ", src_reg: " << tc.src_reg
+        << ", dest_reg: " << tc.dest_reg << ", has_mask: " << tc.has_mask;
+  }
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, ZvfbfminConstraintsTest) {
+  // Test vill trap
+  state_->rv_vector()->SetVectorType(0x80000000);
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  // Append dummy operands
+  auto* vd =
+      state_->GetRegister<mpact::sim::riscv::RVVectorRegister>("v32").first;
+  auto* vs =
+      state_->GetRegister<mpact::sim::riscv::RVVectorRegister>("v8").first;
+  inst.AppendDestination(vd->CreateDestinationOperand(0));
+  inst.AppendSource(vs->CreateSourceOperand());
+
+  coralnpu::sim::Vfwcvtbf16ffv(&inst);
+  // Expect exception: vill set in vtype causes illegal instruction trap
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+
+  // Reset
+  state_->rv_vector()->SetVectorType(0);
+  state_->mcause()->Write(0u);
+
+  // Test rounding mode trap for Vfncvtbf16ffw (uses rounding)
+  state_->rv_fp()->frm()->Write(5u);  // Invalid rounding mode
+  coralnpu::sim::Vfncvtbf16ffw(&inst);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfncvtbf16ffwBasicExecution) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  // Set up source data (F32)
+  std::vector<float> src_data = {1.0f, 2.0f};
+  SetVectorRegisterValues<float>({{"v8", absl::Span<const float>(src_data)}});
+
+  // Set up destination (non-overlapping v10)
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/2, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/false, {10});
+
+  coralnpu::sim::Vfncvtbf16ffw(&inst);
+
+  // Check results
+  auto dest_span = vreg_[10]->data_buffer()->Get<uint16_t>();
+  // 1.0f in BF16 is 0x3F80
+  EXPECT_EQ(dest_span[0], 0x3F80);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfwcvtbf16ffvBasicExecution) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  // Set up source data (BF16 represented as uint16_t)
+  // 1.0f in BF16 is 0x3F80
+  // 2.0f in BF16 is 0x4000
+  std::vector<uint16_t> src_data = {0x3F80, 0x4000};
+  SetVectorRegisterValues<uint16_t>(
+      {{"v8", absl::Span<const uint16_t>(src_data)}});
+
+  // Set up destination (non-overlapping v10, v11)
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/1, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/true, {10});
+
+  coralnpu::sim::Vfwcvtbf16ffv(&inst);
+
+  // Check results
+  auto dest_span = vreg_[10]->data_buffer()->Get<float>();
+  EXPECT_EQ(dest_span[0], 1.0f);
+  EXPECT_EQ(dest_span[1], 2.0f);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfncvtbf16ffwEdgeCases) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  float qnan = std::numeric_limits<float>::quiet_NaN();
+  float snan = std::numeric_limits<float>::signaling_NaN();
+  float pinf = std::numeric_limits<float>::infinity();
+  float ninf = -std::numeric_limits<float>::infinity();
+  std::vector<float> src_data = {qnan, snan, pinf, ninf, 0.0f, -0.0f, 1e-45f};
+  SetVectorRegisterValues<float>({{"v8", absl::Span<const float>(src_data)}});
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/2, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/false, {10});
+  state_->rv_fp()->fflags()->Write(0u);
+  coralnpu::sim::Vfncvtbf16ffw(&inst);
+  auto dest_span = vreg_[10]->data_buffer()->Get<uint16_t>();
+  EXPECT_EQ(dest_span[0], 0x7FC0);
+  EXPECT_EQ(dest_span[1], 0x7FC0);
+  EXPECT_NE(state_->rv_fp()->fflags()->GetUint32() & 0x10, 0);  // NV set
+  EXPECT_EQ(dest_span[2], 0x7F80);
+  EXPECT_EQ(dest_span[3], 0xFF80);
+  EXPECT_EQ(dest_span[4], 0x0000);
+  EXPECT_EQ(dest_span[5], 0x8000);
+  EXPECT_EQ(dest_span[6], 0x0000);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfwcvtbf16ffvEdgeCases) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  std::vector<uint16_t> src_data = {0x7FC0, 0x7F81, 0x7F80,
+                                    0xFF80, 0x0000, 0x8000};
+  SetVectorRegisterValues<uint16_t>(
+      {{"v8", absl::Span<const uint16_t>(src_data)}});
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/1, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/true, {10});
+  state_->rv_fp()->fflags()->Write(0u);
+  coralnpu::sim::Vfwcvtbf16ffv(&inst);
+  auto dest_span = vreg_[10]->data_buffer()->Get<float>();
+  EXPECT_TRUE(std::isnan(dest_span[0]));
+  EXPECT_TRUE(std::isnan(dest_span[1]));
+  EXPECT_NE(state_->rv_fp()->fflags()->GetUint32() & 0x10,
+            0);  // NV set on snan
+  EXPECT_EQ(dest_span[2], std::numeric_limits<float>::infinity());
+  EXPECT_EQ(dest_span[3], -std::numeric_limits<float>::infinity());
+  EXPECT_EQ(dest_span[4], 0.0f);
+  EXPECT_EQ(dest_span[5], -0.0f);
 }
 
 }  // namespace

@@ -18,18 +18,200 @@
 #include <string>
 
 #include "sim/coralnpu_state.h"
+#include "riscv/riscv_fp_info.h"
+#include "riscv/riscv_fp_state.h"
 #include "riscv/riscv_state.h"
 #include "mpact/sim/generic/instruction.h"
 #include "mpact/sim/generic/type_helpers.h"
 
 namespace coralnpu::sim {
 
-using ::mpact::sim::generic::operator*;  // NOLINT: is used below (clang error).
+// Rationale: Helper function to perform BFloat16 rounding as per RISC-V
+// Zvfbfmin. This implements the same rounding logic as scalar fcvt.bf16.s.
+uint16_t RoundBFloat16(uint32_t bits, uint32_t inst_rm,
+                       mpact::sim::riscv::RiscVFPState* fp_state,
+                       uint32_t* fflags) {
+  using ::mpact::sim::riscv::FPExceptions;
+  using ::mpact::sim::riscv::FPRoundingMode;
+  bool sign = (bits >> 31) & 1;
+  bool l = (bits >> 16) & 1;      // LSB
+  bool g = (bits >> 15) & 1;      // Guard
+  bool s = (bits & 0x7FFF) != 0;  // Sticky
+
+  bool increment = false;
+  if (g || s) {
+    *fflags |= static_cast<uint32_t>(FPExceptions::kInexact);
+    auto rm = (inst_rm == 7)
+                  ? (fp_state != nullptr ? fp_state->GetRoundingMode()
+                                         : FPRoundingMode::kRoundToNearest)
+                  : static_cast<FPRoundingMode>(inst_rm);
+    switch (rm) {
+      case FPRoundingMode::kRoundToNearest:
+        increment = g && (l || s);
+        break;
+      case FPRoundingMode::kRoundTowardsZero:
+        increment = false;
+        break;
+      case FPRoundingMode::kRoundUp:
+        increment = !sign && (g || s);
+        break;
+      case FPRoundingMode::kRoundDown:
+        increment = sign && (g || s);
+        break;
+      case FPRoundingMode::kRoundToNearestTiesToMax:
+        increment = g;
+        break;
+      default:
+        break;
+    }
+  }
+  uint32_t exp = (bits >> 23) & 0xFF;
+  uint32_t res_bits = (bits >> 16);
+  if (increment) {
+    res_bits += 1;
+    if ((res_bits & 0x7F80) == 0x7F80 && exp != 0xFF) {
+      *fflags |= static_cast<uint32_t>(FPExceptions::kOverflow) |
+                 static_cast<uint32_t>(FPExceptions::kInexact);
+    }
+  }
+  return static_cast<uint16_t>(res_bits);
+}
+
+void Fcvtsbf16(mpact::sim::generic::Instruction* inst) {
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  mpact::sim::riscv::RiscVFPState* fp_state = state->rv_fp();
+
+  if (fp_state == nullptr) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(
+                    mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  uint32_t inst_rm =
+      mpact::sim::generic::GetInstructionSource<uint32_t>(inst, 1);
+
+  // RISC-V Zfbfmin specification reserves rounding modes 5 and 6.
+  // We must trap with an illegal instruction exception.
+  if (inst_rm == 5 || inst_rm == 6) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(
+                    mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  if (inst_rm == 7 && !fp_state->rounding_mode_valid()) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(
+                    mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  uint64_t rs1 = mpact::sim::generic::GetInstructionSource<uint64_t>(inst, 0);
+
+  uint16_t src_bits = rs1 & 0xFFFF;
+  uint32_t bits = 0;
+  if ((rs1 >> 16) != 0xFFFFFFFFFFFFULL) {
+    bits = 0x7FC00000;  // Canonical float32 NaN
+  } else {
+    // Check for NaN (Exponent 0xFF, Fraction != 0)
+    uint32_t exp = (src_bits >> 7) & 0xFF;
+    uint32_t frac = src_bits & 0x7F;
+    if (exp == 0xFF && frac != 0) {
+      // If SNaN (Fraction MSB is 0), set InvalidOp flag
+      if ((frac & 0x40) == 0) {
+        if (fp_state != nullptr && fp_state->fflags() != nullptr) {
+          fp_state->fflags()->Set(
+              fp_state->fflags()->GetUint32() |
+              static_cast<uint32_t>(
+                  mpact::sim::riscv::FPExceptions::kInvalidOp));
+        }
+      }
+      bits = 0x7FC00000;  // Canonical float32 NaN
+    } else {
+      bits = static_cast<uint32_t>(src_bits) << 16;
+    }
+  }
+
+  auto* dest = inst->Destination(0);
+  auto* db = dest->AllocateDataBuffer();
+  if (db != nullptr) {
+    db->Set<uint64_t>(0, 0xFFFFFFFF00000000ULL | bits);
+    db->Submit();
+  }
+}
+
+void Fcvtbf16s(mpact::sim::generic::Instruction* inst) {
+  using ::mpact::sim::riscv::ExceptionCode;
+
+  uint64_t vs2_64 =
+      mpact::sim::generic::GetInstructionSource<uint64_t>(inst, 0);
+  uint32_t inst_rm =
+      mpact::sim::generic::GetInstructionSource<uint32_t>(inst, 1);
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  mpact::sim::riscv::RiscVFPState* fp_state = state->rv_fp();
+
+  if (fp_state == nullptr) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  if (inst_rm == 5 || inst_rm == 6) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  if (inst_rm == 7 && !fp_state->rounding_mode_valid()) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  uint32_t bits = 0;
+  uint32_t fflags = 0;
+  if ((vs2_64 >> 32) != 0xFFFFFFFFULL) {
+    bits = 0x7FC00000;
+  } else {
+    bits = static_cast<uint32_t>(vs2_64 & 0xFFFFFFFF);
+    uint32_t exp = (bits >> 23) & 0xFF;
+    uint32_t frac = bits & 0x7FFFFF;
+
+    if (exp == 0xFF && frac != 0) {
+      if (!(frac & 0x400000)) {
+        fflags |=
+            static_cast<uint32_t>(mpact::sim::riscv::FPExceptions::kInvalidOp);
+      }
+      bits = 0x7FC00000;
+    }
+  }
+
+  uint16_t result = RoundBFloat16(bits, inst_rm, fp_state, &fflags);
+
+  if (fflags != 0 && fp_state != nullptr && fp_state->fflags() != nullptr) {
+    fp_state->fflags()->Set(fp_state->fflags()->GetUint32() | fflags);
+  }
+
+  auto* dest = inst->Destination(0);
+  auto* db = dest->AllocateDataBuffer();
+  if (db != nullptr) {
+    db->Set<uint64_t>(0, 0xFFFFFFFFFFFF0000ULL | result);
+    db->Submit();
+  }
+}
 
 void CoralNPUIllegalInstruction(mpact::sim::generic::Instruction* inst) {
   auto* state = static_cast<CoralNPUState*>(inst->state());
   state->Trap(/*is_interrupt*/ false, /*trap_value*/ 0,
-              *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+              static_cast<uint64_t>(
+                  mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
               /*epc*/ inst->address(), inst);
 }
 

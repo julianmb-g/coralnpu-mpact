@@ -194,6 +194,10 @@ void CoralNPUVEvnodd(bool scalar, bool strip_mine, Instruction* inst);
 
 template <typename T>
 void CoralNPUVZip(bool scalar, bool strip_mine, Instruction* inst);
+
+void Vfwcvtbf16ffv(Instruction* inst);
+void Vfncvtbf16ffw(Instruction* inst);
+
 }  // namespace coralnpu::sim
 
 #endif  // SIM_CORALNPU_VECTOR_INSTRUCTIONS_H_

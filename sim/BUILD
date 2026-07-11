@@ -67,6 +67,7 @@ cc_library(
         "@abseil-cpp//absl/numeric:bits",
         "@abseil-cpp//absl/types:span",
         "@mpact-riscv//riscv:riscv_state",
+        "@mpact-riscv//riscv:riscv_fp_state",
         "@mpact-sim//mpact/sim/generic:arch_state",
         "@mpact-sim//mpact/sim/generic:core",
         "@mpact-sim//mpact/sim/generic:instruction",
@@ -451,6 +452,7 @@ mpact_isa_decoder(
     ],
     isa_name = "CoralNPUM3",
     deps = [
+        ":coralnpu_instructions",
         ":coralnpu_m3_zfbfmin_overrides",
         ":coralnpu_m3_zfhmin_instructions",
         ":coralnpu_v2_instructions",

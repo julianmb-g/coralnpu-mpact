@@ -119,6 +119,8 @@ cc_library(
     ],
     deps = [
         "//sim:coralnpu_state",
+        "//sim:coralnpu_v2_state",
+        "//sim:coralnpu_m3_user_decoder",
         "@abseil-cpp//absl/random",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
@@ -203,6 +205,27 @@ cc_test(
         "//sim:coralnpu_instructions",
         "@abseil-cpp//absl/functional:bind_front",
         "@com_google_googletest//:gtest_main",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)
+
+cc_test(
+    name = "coralnpu_instructions_test",
+    srcs = ["coralnpu_instructions_test.cc"],
+    copts = [
+        "-Werror",
+        "-Wvla-extension",
+    ],
+    deps = [
+        "//sim:coralnpu_instructions",
+        "//sim:coralnpu_m3_user_decoder",
+        "//sim:coralnpu_v2_state",
+        "@abseil-cpp//absl/functional:bind_front",
+        "@abseil-cpp//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:core",
         "@mpact-sim//mpact/sim/generic:instruction",
     ],
 )

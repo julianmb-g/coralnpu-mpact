@@ -17,6 +17,8 @@
 #ifndef SIM_CORALNPU_INSTRUCTIONS_H_
 #define SIM_CORALNPU_INSTRUCTIONS_H_
 
+#include <cstdint>
+
 #include "mpact/sim/generic/instruction.h"
 
 // We define this empty namespace and using it so that coralnpu_encoder
@@ -24,9 +26,15 @@
 namespace mpact::sim::riscv {}
 using namespace mpact::sim::riscv;  // NOLINT
 
+namespace mpact::sim::riscv {
+class RiscVFPState;
+}
+
 namespace coralnpu::sim {
 
 void CoralNPUIllegalInstruction(mpact::sim::generic::Instruction* inst);
+void Fcvtsbf16(mpact::sim::generic::Instruction* inst);
+void Fcvtbf16s(mpact::sim::generic::Instruction* inst);
 
 void CoralNPUNopInstruction(mpact::sim::generic::Instruction* inst);
 
@@ -37,6 +45,10 @@ void CoralNPULogInstruction(int log_mode,
 
 template <typename T>
 void CoralNPUIStore(mpact::sim::generic::Instruction* inst);
+
+uint16_t RoundBFloat16(uint32_t bits, uint32_t inst_rm,
+                       mpact::sim::riscv::RiscVFPState* fp_state,
+                       uint32_t* fflags);
 
 }  // namespace coralnpu::sim
 

@@ -15,20 +15,28 @@
 #include "sim/coralnpu_vector_instructions.h"
 
 #include <algorithm>
+#include <any>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <type_traits>
 
+#include "sim/coralnpu_instructions.h"
 #include "sim/coralnpu_state.h"
 #include "absl/functional/bind_front.h"
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/numeric/bits.h"
 #include "absl/types/span.h"
+#include "riscv/riscv_fp_info.h"
+#include "riscv/riscv_fp_state.h"
 #include "riscv/riscv_register.h"
+#include "riscv/riscv_state.h"
 #include "mpact/sim/generic/data_buffer.h"
 #include "mpact/sim/generic/instruction.h"
+#include "mpact/sim/generic/register.h"
 #include "mpact/sim/generic/type_helpers.h"
 
 namespace coralnpu::sim {
@@ -37,6 +45,79 @@ using ::mpact::sim::generic::operator*;
 using mpact::sim::generic::DataBuffer;
 using mpact::sim::generic::GetInstructionSource;
 using mpact::sim::riscv::RV32VectorDestinationOperand;
+using mpact::sim::riscv::RV32VectorSourceOperand;
+
+namespace {
+
+bool CheckOverlap(int num_regs_dst, int num_regs_src, bool is_widening,
+                  RV32VectorDestinationOperand* dest_op,
+                  RV32VectorSourceOperand* src_op) {
+  for (int i = 0; i < num_regs_dst; ++i) {
+    auto* dest_reg = std::any_cast<mpact::sim::generic::RegisterBase*>(
+        dest_op->GetObject(i));
+    for (int j = 0; j < num_regs_src; ++j) {
+      auto* src_reg = src_op->GetRegister(j);
+      if (dest_reg == src_reg) {
+        if (is_widening) {
+          if (num_regs_dst <= num_regs_src || i != j) {
+            return true;
+          }
+        } else {
+          if (i != j) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool CheckMaskOverlap(int num_regs_dst, CoralNPUState* state,
+                      RV32VectorDestinationOperand* dest_op) {
+  auto* v0_reg =
+      state->GetRegister<mpact::sim::riscv::RVVectorRegister>("v0").first;
+  for (int i = 0; i < num_regs_dst; ++i) {
+    auto* dest_reg = std::any_cast<mpact::sim::generic::RegisterBase*>(
+        dest_op->GetObject(i));
+    if (dest_reg == v0_reg) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool CheckZvfbfminVectorOpConstraints(CoralNPUState* state, Instruction* inst,
+                                      bool check_rounding) {
+  if ((state->rv_vector()->vtype() & 0x80000000) != 0) {
+    LOG(INFO) << "Zvfbfmin constraints: vill trap";
+    return false;
+  }
+  if (check_rounding) {
+    uint64_t frm = state->rv_fp()->frm()->AsUint32();
+    if (frm > 4) {
+      LOG(INFO) << "Zvfbfmin constraints: frm trap";
+      return false;
+    }
+  }
+  return true;
+}
+
+uint16_t ConvertF32ToBF16(uint32_t bits, CoralNPUState* state,
+                          uint32_t* fflags) {
+  uint32_t exp = (bits >> 23) & 0xFF;
+  uint32_t frac = bits & 0x7FFFFF;
+  if (exp == 0xFF && frac != 0) {
+    if (!(frac & 0x400000)) {
+      *fflags |=
+          static_cast<uint32_t>(mpact::sim::riscv::FPExceptions::kInvalidOp);
+    }
+    bits = 0x7FC00000;
+  }
+  return RoundBFloat16(bits, 7 /* inst_rm: dynamic */, state->rv_fp(), fflags);
+}
+
+}  // namespace
 
 template <typename Vd, typename Vs1, typename Vs2>
 Vd BinaryOpInvoke(std::function<Vd(Vs1, Vs2)> op, Vd vd, Vs1 vs1, Vs2 vs2) {
@@ -52,7 +133,7 @@ Vs1 CommonBinaryOpGetArg1(const Instruction* inst, bool scalar, int num_ops,
                           int op_index, int dst_element_index,
                           int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(Vs1);
   auto src_element_index = op_index * elts_per_register +
                            dst_element_index * sizeof(Vd) / sizeof(Vs1);
@@ -71,7 +152,7 @@ Vs2 CommonBinaryOpGetArg2(const Instruction* inst, bool scalar, int num_ops,
                           int op_index, int dst_element_index,
                           int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(Vs2);
   auto src_element_index = op_index * elts_per_register +
                            dst_element_index * sizeof(Vd) / sizeof(Vs2) +
@@ -94,7 +175,7 @@ void CoralNPUBinaryVectorOp(const Instruction* inst, bool scalar,
                             SourceArgGetter<Vs2, Vd, Vs1, Vs2> arg2_getter =
                                 CommonBinaryOpGetArg2<Vd, Vs1, Vs2>) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_dest_register = vector_size_in_bytes / sizeof(Vd);
 
   // For coralnpu, stripmining issues 4 contiguous vector ops.
@@ -143,7 +224,7 @@ void CoralNPUUnaryVectorOp(const Instruction* inst, bool strip_mine,
                            SourceArgGetter<Vs, Vd, Vs, Vs> arg_getter =
                                CommonBinaryOpGetArg1<Vd, Vs, Vs>) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_dest_register = vector_size_in_bytes / sizeof(Vd);
 
   // For coralnpu, stripmining issues 4 contiguous vector ops.
@@ -170,7 +251,7 @@ void CoralNPUVAdd(bool scalar, bool strip_mine, Instruction* inst) {
   // Return vs1 + vs2.
   CoralNPUBinaryVectorOp(inst, scalar, strip_mine,
                          std::function<T(T, T)>([](T vs1, T vs2) -> T {
-                           using UT = std::make_unsigned_t<T>;
+                           using UT = typename std::make_unsigned<T>::type;
                            // Cast to unsigned type before the operation to
                            // avoid undefined overflow behavior in intx_t.
                            UT uvs1 = static_cast<UT>(vs1);
@@ -187,7 +268,7 @@ void CoralNPUVSub(bool scalar, bool strip_mine, Instruction* inst) {
   // Return vs1 - vs2.
   CoralNPUBinaryVectorOp(inst, scalar, strip_mine,
                          std::function<T(T, T)>([](T vs1, T vs2) -> T {
-                           using UT = std::make_unsigned_t<T>;
+                           using UT = typename std::make_unsigned<T>::type;
                            // Cast to unsigned type before the operation to
                            // avoid undefined overflow behavior in intx_t.
                            UT uvs1 = static_cast<UT>(vs1);
@@ -204,7 +285,7 @@ void CoralNPUVRSub(bool scalar, bool strip_mine, Instruction* inst) {
   // Return vs2 - vs1.
   CoralNPUBinaryVectorOp(inst, scalar, strip_mine,
                          std::function<T(T, T)>([](T vs1, T vs2) -> T {
-                           using UT = std::make_unsigned_t<T>;
+                           using UT = typename std::make_unsigned<T>::type;
                            // Cast to unsigned type before the operation to
                            // avoid undefined overflow behavior in intx_t.
                            UT uvs1 = static_cast<UT>(vs1);
@@ -299,11 +380,11 @@ void CoralNPUVAbsd(bool scalar, bool strip_mine, Instruction* inst) {
   // Returns the absolute difference between vs1 and vs2.
   // Note: for signed(INTx_MAX - INTx_MIN) the result will be UINTx_MAX.
   CoralNPUBinaryVectorOp<false /* halftype */, false /* widen_dst */,
-                         std::make_unsigned_t<T>, T, T>(
+                         typename std::make_unsigned<T>::type, T, T>(
       inst, scalar, strip_mine,
-      std::function<std::make_unsigned_t<T>(T, T)>(
-          [](T vs1, T vs2) -> std::make_unsigned_t<T> {
-            using UT = std::make_unsigned_t<T>;
+      std::function<typename std::make_unsigned<T>::type(T, T)>(
+          [](T vs1, T vs2) -> typename std::make_unsigned<T>::type {
+            using UT = typename std::make_unsigned<T>::type;
             // Cast to unsigned type before the operation to avoid undefined
             // overflow behavior in intx_t.
             UT uvs1 = static_cast<UT>(vs1);
@@ -355,7 +436,7 @@ void CoralNPUVAdd3(bool scalar, bool strip_mine, Instruction* inst) {
                          T>(
       inst, scalar, strip_mine,
       std::function<T(T, T, T)>([](T vd, T vs1, T vs2) -> T {
-        using UT = std::make_unsigned_t<T>;
+        using UT = typename std::make_unsigned<T>::type;
         UT uvs1 = static_cast<UT>(vs1);
         UT uvs2 = static_cast<UT>(vs2);
         UT uvd = static_cast<UT>(vd);
@@ -371,7 +452,7 @@ template void CoralNPUVAdd3<int32_t>(bool, bool, Instruction*);
 // when compiled with --config=asan, will trigger an exception.
 template <typename T>
 inline T VAddsHelper(T vs1, T vs2) {
-  using UT = std::make_unsigned_t<T>;
+  using UT = typename std::make_unsigned<T>::type;
   UT uvs1 = static_cast<UT>(vs1);
   UT uvs2 = static_cast<UT>(vs2);
   UT usum = uvs1 + uvs2;
@@ -416,7 +497,7 @@ template void CoralNPUVAddsu<uint32_t>(bool, bool, Instruction*);
 // Helper function for Vsubs (saturated signed subtraction).
 template <typename T>
 inline T VSubsHelper(T vs1, T vs2) {
-  using UT = std::make_unsigned_t<T>;
+  using UT = typename std::make_unsigned<T>::type;
   UT uvs1 = static_cast<UT>(vs1);
   UT uvs2 = static_cast<UT>(vs2);
   UT usub = uvs1 - uvs2;
@@ -482,7 +563,7 @@ void CoralNPUVAcc(bool scalar, bool strip_mine, Instruction* inst) {
   CoralNPUBinaryVectorOp(
       inst, scalar, strip_mine,
       std::function<Td(Td, Ts2)>([](Td vs1, Ts2 vs2) -> Td {
-        using UTd = std::make_unsigned_t<Td>;
+        using UTd = typename std::make_unsigned<Td>::type;
         return static_cast<Td>(static_cast<UTd>(vs1) + static_cast<UTd>(vs2));
       }));
 }
@@ -496,7 +577,7 @@ Vs1 PackedBinaryOpGetArg1(const Instruction* inst, bool scalar, int num_ops,
                           int op_index, int dst_element_index,
                           int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(Vs1);
   auto src_element_index = op_index * elts_per_register +
                            dst_element_index * sizeof(Vd) / sizeof(Vs1);
@@ -508,7 +589,7 @@ Vs2 PackedBinaryOpGetArg2(const Instruction* inst, bool scalar, int num_ops,
                           int op_index, int dst_element_index,
                           int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(Vs2);
   auto src_element_index = op_index * elts_per_register +
                            dst_element_index * sizeof(Vd) / sizeof(Vs2) + 1;
@@ -734,7 +815,7 @@ template void CoralNPUVSrl<uint32_t>(bool, bool, Instruction*);
 template <typename T>
 T CoralNPUVShiftHelper(bool round, T vs1, T vs2) {
   using WT = typename mpact::sim::generic::WideType<T>::type;
-  if (std::is_signed_v<T> == true) {
+  if (std::is_signed<T>::value == true) {
     constexpr int kMaxShiftBit = sizeof(T) * 8;
     int shamt = vs2;
     WT shift = vs1;
@@ -749,7 +830,7 @@ T CoralNPUVShiftHelper(bool round, T vs1, T vs2) {
                (round ? static_cast<WT>(1ll << (shamt - 1)) : 0)) >>
               shamt;
     } else {  // shamt < 0
-      using UT = std::make_unsigned_t<T>;
+      using UT = typename std::make_unsigned<T>::type;
       UT ushamt =
           static_cast<UT>(-shamt <= kMaxShiftBit ? -shamt : kMaxShiftBit);
       CHECK_LE(ushamt, kMaxShiftBit);
@@ -769,7 +850,7 @@ T CoralNPUVShiftHelper(bool round, T vs1, T vs2) {
   // unsigned.
   constexpr int kMaxShiftBit = sizeof(T) * 8;
   // Shift can be positive/negative.
-  int shamt = static_cast<std::make_signed_t<T>>(vs2);
+  int shamt = static_cast<typename std::make_signed<T>::type>(vs2);
   WT shift = vs1;
   if (!vs1) {
     return 0;
@@ -780,7 +861,7 @@ T CoralNPUVShiftHelper(bool round, T vs1, T vs2) {
              (round ? static_cast<WT>(1ull << (shamt - 1)) : 0)) >>
             shamt;
   } else {
-    using UT = std::make_unsigned_t<T>;
+    using UT = typename std::make_unsigned<T>::type;
     UT ushamt = static_cast<UT>(-shamt <= kMaxShiftBit ? -shamt : kMaxShiftBit);
     shift = static_cast<WT>(vs1) << (ushamt);
   }
@@ -861,7 +942,7 @@ Vs1 VSransOpGetArg1(const Instruction* inst, bool scalar, int num_ops,
                     int op_index, int dst_element_index, int dst_reg_index) {
   static_assert(2 * sizeof(Vd) == sizeof(Vs1) || 4 * sizeof(Vd) == sizeof(Vs1));
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(Vs1);
   auto src_element_index = op_index * elts_per_register +
                            dst_element_index * sizeof(Vd) / sizeof(Vs1);
@@ -937,7 +1018,7 @@ void CoralNPUVMuls(bool scalar, bool strip_mine, Instruction* inst) {
       inst, scalar, strip_mine, std::function<T(T, T)>([](T vs1, T vs2) -> T {
         using WT = typename mpact::sim::generic::WideType<T>::type;
         WT result = static_cast<WT>(vs1) * static_cast<WT>(vs2);
-        if (std::is_signed_v<T>) {
+        if (std::is_signed<T>::value) {
           result = std::max(
               static_cast<WT>(std::numeric_limits<T>::min()),
               std::min(static_cast<WT>(std::numeric_limits<T>::max()), result));
@@ -1066,7 +1147,7 @@ T VSlidenOpGetArg1(bool horizontal, int index, const Instruction* inst,
                    bool scalar, int num_ops, int op_index,
                    int dst_element_index, int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(T);
 
   using Interleave = struct {
@@ -1140,7 +1221,7 @@ T VSlidepOpGetArg1(bool horizontal, int index, const Instruction* inst,
                    bool scalar, int num_ops, int op_index,
                    int dst_element_index, int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   auto elts_per_register = vector_size_in_bytes / sizeof(T);
 
   using Interleave = struct {
@@ -1228,7 +1309,7 @@ template <typename T>
 T VEvnOpGetArg1(const Instruction* inst, bool scalar, int num_ops, int op_index,
                 int dst_element_index, int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   const int elts_per_register = vector_size_in_bytes / sizeof(T);
 
   auto src_element_index =
@@ -1260,7 +1341,7 @@ template <typename T>
 T VOddOpGetArg1(const Instruction* inst, bool scalar, int num_ops, int op_index,
                 int dst_element_index, int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   const int elts_per_register = vector_size_in_bytes / sizeof(T);
 
   auto src_element_index =
@@ -1316,7 +1397,7 @@ template <typename T>
 T VZipOpGetArg1(const Instruction* inst, bool scalar, int num_ops, int op_index,
                 int dst_element_index, int dst_reg_index) {
   auto state = static_cast<CoralNPUState*>(inst->state());
-  const int vector_size_in_bytes = state->vector_length() / 8;
+  const int vector_size_in_bytes = state->vector_register_width();
   const int elts_per_register = vector_size_in_bytes / sizeof(T);
   const int half_elts_per_register = elts_per_register / 2;
 
@@ -1344,4 +1425,131 @@ void CoralNPUVZip(bool scalar, bool strip_mine, Instruction* inst) {
 template void CoralNPUVZip<int8_t>(bool, bool, Instruction*);
 template void CoralNPUVZip<int16_t>(bool, bool, Instruction*);
 template void CoralNPUVZip<int32_t>(bool, bool, Instruction*);
+
+void Vfwcvtbf16ffv(Instruction* inst) {
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  if (state == nullptr || state->rv_vector() == nullptr) return;
+
+  auto* dest_op = static_cast<mpact::sim::riscv::RV32VectorDestinationOperand*>(
+      inst->Destination(0));
+  auto* src_op =
+      static_cast<mpact::sim::riscv::RV32VectorSourceOperand*>(inst->Source(0));
+
+  int num_regs_dst = dest_op->size();
+  int num_regs_src = src_op->size();
+
+  bool is_masked = false;
+  if (inst->SourcesSize() >= 2) {
+    auto vm_op = inst->Source(1);
+    if (!vm_op->AsString().empty()) {
+      is_masked = true;
+    }
+  }
+
+  bool overlap = CheckOverlap(num_regs_dst, num_regs_src, /*is_widening=*/true,
+                              dest_op, src_op);
+
+  if (is_masked && CheckMaskOverlap(num_regs_dst, state, dest_op)) {
+    overlap = true;
+  }
+
+  if (overlap || !CheckZvfbfminVectorOpConstraints(state, inst,
+                                                   /*check_rounding=*/false)) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(
+                    mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+  auto* dest_db = dest_op->AllocateDataBuffer(0);
+  if (dest_db == nullptr) return;
+
+  auto dest_span = dest_db->template Get<float>();
+  auto* fp_state = state->rv_fp();
+
+  for (size_t i = 0; i < dest_span.size(); ++i) {
+    uint16_t src_bf16 =
+        mpact::sim::generic::GetInstructionSource<uint16_t>(inst, 0, i);
+    uint32_t src_bits = src_bf16;
+    uint32_t exp = (src_bits >> 7) & 0xFF;
+    uint32_t frac = src_bits & 0x7F;
+    float res;
+    if (exp == 0xFF && frac != 0) {
+      if ((frac & 0x40) == 0) {
+        if (fp_state != nullptr && fp_state->fflags() != nullptr) {
+          fp_state->fflags()->Set(
+              fp_state->fflags()->GetUint32() |
+              static_cast<uint32_t>(
+                  mpact::sim::riscv::FPExceptions::kInvalidOp));
+        }
+      }
+      uint32_t bits = 0x7FC00000;
+      std::memcpy(&res, &bits, sizeof(float));
+    } else {
+      uint32_t bits = src_bits << 16;
+      std::memcpy(&res, &bits, sizeof(float));
+    }
+    dest_span[i] = res;
+  }
+  dest_db->Submit();
+}
+
+void Vfncvtbf16ffw(Instruction* inst) {
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  if (state == nullptr || state->rv_vector() == nullptr) return;
+
+  auto* dest_op = static_cast<mpact::sim::riscv::RV32VectorDestinationOperand*>(
+      inst->Destination(0));
+  auto* src_op =
+      static_cast<mpact::sim::riscv::RV32VectorSourceOperand*>(inst->Source(0));
+
+  int num_regs_dst = dest_op->size();
+  int num_regs_src = src_op->size();
+
+  bool is_masked = false;
+  if (inst->SourcesSize() >= 2) {
+    auto vm_op = inst->Source(1);
+    if (!vm_op->AsString().empty()) {
+      is_masked = true;
+    }
+  }
+
+  bool overlap = CheckOverlap(num_regs_dst, num_regs_src, /*is_widening=*/false,
+                              dest_op, src_op);
+
+  if (is_masked && CheckMaskOverlap(num_regs_dst, state, dest_op)) {
+    overlap = true;
+  }
+
+  if (overlap ||
+      !CheckZvfbfminVectorOpConstraints(state, inst, /*check_rounding=*/true)) {
+    LOG(INFO) << "Vfncvtbf16ffw: Trap";
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                static_cast<uint64_t>(
+                    mpact::sim::riscv::ExceptionCode::kIllegalInstruction),
+                inst->address(), inst);
+    return;
+  }
+
+  auto* dest_db = dest_op->AllocateDataBuffer(0);
+  if (dest_db == nullptr) {
+    LOG(INFO) << "Vfncvtbf16ffw: dest_db is null";
+    return;
+  }
+
+  auto dest_span = dest_db->template Get<uint16_t>();
+
+  uint32_t fflags = 0;
+  for (size_t i = 0; i < dest_span.size(); ++i) {
+    float src_f = mpact::sim::generic::GetInstructionSource<float>(inst, 0, i);
+    uint32_t bits;
+    std::memcpy(&bits, &src_f, 4);
+    dest_span[i] = ConvertF32ToBF16(bits, state, &fflags);
+  }
+  dest_db->Submit();
+  if (state->rv_fp() != nullptr && state->rv_fp()->fflags() != nullptr) {
+    state->rv_fp()->fflags()->Set(state->rv_fp()->fflags()->GetUint32() |
+                                  fflags);
+  }
+}
 }  // namespace coralnpu::sim

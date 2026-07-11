@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -29,14 +30,20 @@
 #include <utility>
 #include <vector>
 
+#include "sim/coralnpu_m3_user_decoder.h"
 #include "sim/coralnpu_state.h"
+#include "sim/coralnpu_v2_state.h"
 #include "googletest/include/gtest/gtest.h"
 #include "absl/random/random.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "riscv/riscv_fp_info.h"
+#include "riscv/riscv_fp_state.h"
 #include "riscv/riscv_register.h"
 #include "riscv/riscv_state.h"
+#include "riscv/riscv_vector_state.h"
+#include "mpact/sim/generic/decoder_interface.h"
 #include "mpact/sim/generic/instruction.h"
 #include "mpact/sim/generic/register.h"
 #include "mpact/sim/generic/state_item.h"
@@ -65,18 +72,50 @@ constexpr int kVd = 32;
 constexpr int kVs1 = 8;
 constexpr int kVs2 = 24;
 
+template <typename StateType>
+struct CoralNPUVectorInstructionsTestTraits;
+
+template <>
+struct CoralNPUVectorInstructionsTestTraits<CoralNPUState> {
+  static void ConfigureMemory(CoralNPUState* state) {
+    state->set_max_physical_address(kDataLoadAddress + 4095);
+  }
+  static mpact::sim::generic::DecoderInterface* CreateDecoder(
+      CoralNPUState* state, FlatDemandMemory* memory) {
+    return nullptr;
+  }
+};
+
+template <>
+struct CoralNPUVectorInstructionsTestTraits<CoralNPUV2State> {
+  static void ConfigureMemory(CoralNPUV2State* state) {
+    state->AddMemoryRegion(0, 0x100000,
+                           coralnpu::sim::MemoryPermission::kReadWriteExecute);
+  }
+  static mpact::sim::generic::DecoderInterface* CreateDecoder(
+      CoralNPUV2State* state, FlatDemandMemory* memory) {
+    return new CoralNPUM3UserDecoder(state, memory);
+  }
+};
+
 // This is the base class for vector instruction test fixtures. It implements
 // generic methods for testing and supporting testing of the RiscV vector
 // instructions.
-class CoralNPUVectorInstructionsTestBase : public testing::Test {
+template <typename StateType>
+class CoralNPUVectorInstructionsTestBaseImpl : public testing::Test {
  public:
-  CoralNPUVectorInstructionsTestBase() {
+  CoralNPUVectorInstructionsTestBaseImpl() {
     memory_ = new FlatDemandMemory(0);
-    state_ =
-        new CoralNPUState("test", mpact::sim::riscv::RiscVXlen::RV32, memory_);
+    state_ = new StateType("test", mpact::sim::riscv::RiscVXlen::RV32, memory_);
+    CoralNPUVectorInstructionsTestTraits<StateType>::ConfigureMemory(state_);
+    fp_state_ = new mpact::sim::riscv::RiscVFPState(state_->csr_set(), state_);
+    fp_state_->SetRoundingMode(
+        mpact::sim::riscv::FPRoundingMode::kRoundToNearest);
+    state_->set_rv_fp(fp_state_);
+
     // Initialize a portion of memory with a known pattern.
     auto* db = state_->db_factory()->Allocate(8192);
-    auto span = db->Get<uint8_t>();
+    auto span = db->template Get<uint8_t>();
     for (int i = 0; i < 8192; i++) {
       span[i] = i & 0xff;
     }
@@ -86,12 +125,20 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
     // kDataLoadAddress - 4096, the maximum address is at kDataLoadAddress +
     // 4095.
     state_->set_max_physical_address(kDataLoadAddress + 4095);
+
+    auto* rv_vector = new mpact::sim::riscv::RiscVVectorState(state_, 32);
+    state_->set_rv_vector(rv_vector);
+    rv_vector->SetVectorType(0);
+
     for (int i = 1; i < 32; i++) {
-      xreg_[i] = state_->GetRegister<RV32Register>(absl::StrCat("x", i)).first;
+      xreg_[i] =
+          state_->template GetRegister<RV32Register>(absl::StrCat("x", i))
+              .first;
     }
     for (int i = 1; i < kNumVectorRegister; i++) {
       vreg_[i] =
-          state_->GetRegister<RVVectorRegister>(absl::StrCat("v", i)).first;
+          state_->template GetRegister<RVVectorRegister>(absl::StrCat("v", i))
+              .first;
     }
   }
 
@@ -365,8 +412,12 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
     }
   }
 
-  ~CoralNPUVectorInstructionsTestBase() override {
+  ~CoralNPUVectorInstructionsTestBaseImpl() override {
+    delete decoder_;
+    delete fp_state_;
+    auto* rv_vector = state_->rv_vector();
     delete state_;
+    delete rv_vector;
     delete memory_;
   }
 
@@ -407,7 +458,8 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
   void SetVectorRegisterValues(
       absl::Span<const std::tuple<std::string, Span<const T>>> values) {
     for (auto& [vreg_name, span] : values) {
-      auto* vreg = state_->GetRegister<RVVectorRegister>(vreg_name).first;
+      auto* vreg =
+          state_->template GetRegister<RVVectorRegister>(vreg_name).first;
       auto* db = state_->db_factory()->MakeCopyOf(vreg->data_buffer());
       db->template Set<T>(span);
       vreg->SetDataBuffer(db);
@@ -420,9 +472,9 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
   void SetRegisterValues(
       absl::Span<const std::tuple<std::string, const T>> values) {
     for (auto& [reg_name, value] : values) {
-      auto* reg = state_->GetRegister<RegisterType>(reg_name).first;
-      auto* db =
-          state_->db_factory()->Allocate<typename RegisterType::ValueType>(1);
+      auto* reg = state_->template GetRegister<RegisterType>(reg_name).first;
+      auto* db = state_->db_factory()
+                     ->template Allocate<typename RegisterType::ValueType>(1);
       db->template Set<T>(0, value);
       reg->SetDataBuffer(db);
       db->DecRef();
@@ -435,11 +487,11 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
                               absl::Span<const std::string> sources,
                               absl::Span<const std::string> destinations) {
     for (auto& reg_name : sources) {
-      auto* reg = state_->GetRegister<RV32Register>(reg_name).first;
+      auto* reg = state_->template GetRegister<RV32Register>(reg_name).first;
       inst->AppendSource(reg->CreateSourceOperand());
     }
     for (auto& reg_name : destinations) {
-      auto* reg = state_->GetRegister<RV32Register>(reg_name).first;
+      auto* reg = state_->template GetRegister<RV32Register>(reg_name).first;
       inst->AppendDestination(reg->CreateDestinationOperand(0));
     }
   }
@@ -458,7 +510,7 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
            i++) {
         std::string reg_name = absl::StrCat("v", i + src1_reg);
         reg_vec.push_back(
-            state_->GetRegister<RVVectorRegister>(reg_name).first);
+            state_->template GetRegister<RVVectorRegister>(reg_name).first);
       }
       auto* op = new RV32VectorSourceOperand(absl::Span<RegisterBase*>(reg_vec),
                                              absl::StrCat("v", src1_reg));
@@ -469,7 +521,7 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
       for (int i = 0; (i < num_ops) && (i + reg_no < kNumVectorRegister); i++) {
         std::string reg_name = absl::StrCat("v", i + reg_no);
         reg_vec.push_back(
-            state_->GetRegister<RVVectorRegister>(reg_name).first);
+            state_->template GetRegister<RVVectorRegister>(reg_name).first);
       }
       auto* op = new RV32VectorSourceOperand(absl::Span<RegisterBase*>(reg_vec),
                                              absl::StrCat("v", reg_no));
@@ -482,7 +534,7 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
            i++) {
         std::string reg_name = absl::StrCat("v", i + reg_no);
         reg_vec.push_back(
-            state_->GetRegister<RVVectorRegister>(reg_name).first);
+            state_->template GetRegister<RVVectorRegister>(reg_name).first);
       }
       auto* op = new RV32VectorDestinationOperand(
           absl::Span<RegisterBase*>(reg_vec), 0, absl::StrCat("v", reg_no));
@@ -491,6 +543,24 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
   }
 
   using InstructionPtr = std::unique_ptr<Instruction, void (*)(Instruction*)>;
+  InstructionPtr CreateInstructionFromHex(uint32_t inst_word) {
+    if (state_->rv_vector() == nullptr) {
+      state_->set_rv_vector(
+          new mpact::sim::riscv::RiscVVectorState(state_, 32));
+    }
+    if (!decoder_) {
+      decoder_ = CoralNPUVectorInstructionsTestTraits<StateType>::CreateDecoder(
+          state_, memory_);
+    }
+    auto* db = state_->db_factory()->template Allocate<uint32_t>(1);
+    db->template Set<uint32_t>(0, inst_word);
+    memory_->Store(next_instruction_address_, db);
+    db->DecRef();
+    InstructionPtr inst(decoder_->DecodeInstruction(next_instruction_address_),
+                        [](Instruction* inst) { inst->DecRef(); });
+    next_instruction_address_ += 4;
+    return inst;
+  }
   InstructionPtr CreateInstruction() {
     InstructionPtr inst(new Instruction(next_instruction_address_, state_),
                         [](Instruction* inst) { inst->DecRef(); });
@@ -501,10 +571,15 @@ class CoralNPUVectorInstructionsTestBase : public testing::Test {
 
   RVVectorRegister* vreg_[kNumVectorRegister];
   RV32Register* xreg_[32];
-  CoralNPUState* state_;
+  StateType* state_;
+  mpact::sim::riscv::RiscVFPState* fp_state_;
   FlatDemandMemory* memory_;
+  mpact::sim::generic::DecoderInterface* decoder_ = nullptr;
   absl::BitGen bitgen_;
   uint32_t next_instruction_address_ = kInstAddress;
 };
+
+using CoralNPUVectorInstructionsTestBase =
+    CoralNPUVectorInstructionsTestBaseImpl<CoralNPUState>;
 }  // namespace coralnpu::sim::test
 #endif  // SIM_TEST_CORALNPU_VECTOR_INSTRUCTIONS_TEST_BASE_H_

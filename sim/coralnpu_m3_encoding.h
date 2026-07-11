@@ -22,6 +22,8 @@
 #include "sim/coralnpu_m3_enums.h"
 #include "sim/coralnpu_v2_encoding_template.h"
 #include "sim/coralnpu_v2_state.h"
+#include "mpact/sim/generic/operand_interface.h"
+#include "mpact/sim/generic/register.h"
 
 namespace coralnpu::sim {
 
@@ -42,10 +44,26 @@ class CoralNPUM3Encoding
       ::coralnpu::sim::isa32_m3::DestOpEnum,
       ::coralnpu::sim::encoding_m3::Extractors>;
 
-  explicit CoralNPUM3Encoding(CoralNPUV2State* state) : Base(state) {}
+  explicit CoralNPUM3Encoding(CoralNPUV2State* state);
 
   // Parses an instruction and determines the opcode.
   void ParseInstruction(uint32_t inst_word);
+
+  ::mpact::sim::generic::SourceOperandInterface* GetSource(
+      ::coralnpu::sim::isa32_m3::SlotEnum slot, int entry,
+      ::coralnpu::sim::isa32_m3::OpcodeEnum opcode,
+      ::coralnpu::sim::isa32_m3::SourceOpEnum op, int source_no) override;
+
+  ::mpact::sim::generic::DestinationOperandInterface* GetDestination(
+      ::coralnpu::sim::isa32_m3::SlotEnum slot, int entry,
+      ::coralnpu::sim::isa32_m3::OpcodeEnum opcode,
+      ::coralnpu::sim::isa32_m3::DestOpEnum op, int dest_no,
+      int latency) override;
+
+  ::mpact::sim::generic::RegisterBase* GetVReg(int index);
+
+ private:
+  ::mpact::sim::generic::RegisterBase* vregs_[32] = {nullptr};
 };
 
 }  // namespace coralnpu::sim

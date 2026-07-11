@@ -345,7 +345,42 @@ slot riscv_zve32f {
   }
 }
 
-slot coralnpu_m3 : coralnpu_v2, riscv_zve32f {
+slot riscv_zvfbfmin_scalar {
+  includes {
+    #include "sim/coralnpu_instructions.h"
+  }
+  default size = 4;
+  default latency = global_latency;
+  resources TwoOp = { next_pc, frs1 : frd[0..]};
+  opcodes {
+    fcvt_bf16_s{: frs1, rm : frd, fflags},
+      resources: TwoOp,
+      semfunc: "&::coralnpu::sim::Fcvtbf16s",
+      disasm: "fcvt.bf16.s", "%frd, %frs1";
+    fcvt_s_bf16{: frs1, rm : frd, fflags},
+      resources: TwoOp,
+      semfunc: "&::coralnpu::sim::Fcvtsbf16",
+      disasm: "fcvt.s.bf16", "%frd, %frs1";
+  }
+}
+
+slot riscv_zvfbfmin_vector {
+  includes {
+    #include "sim/coralnpu_vector_instructions.h"
+  }
+  default size = 4;
+  default latency = global_latency;
+  opcodes {
+    vfwcvtbf16_f_f_v{: vs2, vmask: vd, fflags},
+      disasm: "vfwcvtbf16.f.f.v", "%vd, %vs2, %vmask",
+      semfunc: "&::coralnpu::sim::Vfwcvtbf16ffv";
+    vfncvtbf16_f_f_w{: vs2, vmask: vd, fflags},
+      disasm: "vfncvtbf16.f.f.w", "%vd, %vs2, %vmask",
+      semfunc: "&::coralnpu::sim::Vfncvtbf16ffw";
+  }
+}
+
+slot coralnpu_m3 : coralnpu_v2, riscv_zve32f, riscv_zvfbfmin_scalar, riscv_zvfbfmin_vector {
   default size = 4;
   default latency = global_latency;
   default opcode =
