@@ -557,7 +557,7 @@ class CoralNPUVectorInstructionsTestBaseImpl : public testing::Test {
     memory_->Store(next_instruction_address_, db);
     db->DecRef();
     InstructionPtr inst(decoder_->DecodeInstruction(next_instruction_address_),
-                        [](Instruction* inst) { inst->DecRef(); });
+                        [](Instruction* inst) { if (inst != nullptr) inst->DecRef(); });
     next_instruction_address_ += 4;
     return inst;
   }

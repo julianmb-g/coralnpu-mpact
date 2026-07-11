@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "sim/coralnpu_v2_instructions.h"
+#include "sim/coralnpu_v2_user_decoder.h"
 
 #include <algorithm>
 #include <array>
@@ -2954,6 +2955,53 @@ TEST_F(CoralNPUV2InstructionTest,
   // It MUST trap on the second element (0x20000) because 0x20000 is not mapped.
   EXPECT_TRUE(was_trap_handler_called_);
   EXPECT_EQ(trap_value_, 0x20000);
+}
+
+TEST_F(CoralNPUV2InstructionTest, VmaskExceptionTest) {
+  // Instantiate the V2 decoder.
+  auto decoder = std::make_unique<coralnpu::sim::CoralNPUV2UserDecoder>(
+      state_.get(), memory_.get());
+
+  // Store 0x02a48457 (unmasked vadd_vv) at address 0x1000
+  uint32_t inst_addr = 0x1000;
+  auto* db = state_->db_factory()->template Allocate<uint32_t>(1);
+  db->template Set<uint32_t>(0, 0x02a48457);
+  memory_->Store(inst_addr, db);
+  db->DecRef();
+
+  // 1. Decode and execute unmasked vadd.vv -> should execute without trap.
+  {
+    std::unique_ptr<Instruction, void (*)(Instruction*)> instruction(
+        decoder->DecodeInstruction(inst_addr),
+        [](Instruction* inst) { if (inst != nullptr) inst->DecRef(); });
+    ASSERT_NE(instruction, nullptr);
+
+    was_trap_handler_called_ = false;
+    instruction->Execute(/*context=*/nullptr);
+    EXPECT_FALSE(was_trap_handler_called_);
+  }
+
+  // Store 0x00a48457 (masked vadd_vv) at address 0x1004
+  inst_addr = 0x1004;
+  db = state_->db_factory()->template Allocate<uint32_t>(1);
+  db->template Set<uint32_t>(0, 0x00a48457);
+  memory_->Store(inst_addr, db);
+  db->DecRef();
+
+  // 2. Decode and execute masked vadd.vv -> should fail decoding as vadd_vv
+  // (returning nullptr or executing as an IllegalInstruction).
+  {
+    std::unique_ptr<Instruction, void (*)(Instruction*)> instruction(
+        decoder->DecodeInstruction(inst_addr),
+        [](Instruction* inst) { if (inst != nullptr) inst->DecRef(); });
+    if (instruction != nullptr) {
+      was_trap_handler_called_ = false;
+      instruction->Execute(/*context=*/nullptr);
+      EXPECT_TRUE(was_trap_handler_called_);
+    } else {
+      SUCCEED();
+    }
+  }
 }
 
 }  // namespace

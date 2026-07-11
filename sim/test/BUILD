@@ -374,6 +374,7 @@ cc_test(
     copts = ["-Werror"],
     deps = [
         "//sim:coralnpu_v2_instructions",
+        "//sim:coralnpu_v2_user_decoder",
         "//sim:coralnpu_v2_state",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/functional:bind_front",
