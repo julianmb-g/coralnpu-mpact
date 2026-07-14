@@ -3,10 +3,6 @@
 
 #include "core_portme.h"
 
-// External declaration from core_portme.c
-void reset_portable_malloc();
-void* portable_malloc(uint32_t size);
-
 // Helper to calculate aligned size (64 bytes)
 static uint32_t get_aligned_size(uint32_t size) { return (size + 63) & ~63; }
 
@@ -80,9 +76,6 @@ int main() {
     ee_printf("Error: Allocation after memory full did not fail!\n");
     return 1;
   }
-
-  double nan_val = NAN;
-  ee_printf("NaN test: %f\n", nan_val);
 
   ee_printf("portable_malloc tests passed\n");
   return 0;

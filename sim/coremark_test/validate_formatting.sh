@@ -1,12 +1,12 @@
 #!/bin/bash
 
-for INPUT_FILE in "$@"; do
-  if [ ! -f "$INPUT_FILE" ]; then
-    echo "Error: File $INPUT_FILE not found."
+for input_file in "$@"; do
+  if [[ ! -f "$input_file" ]]; then
+    printf "Error: File %s not found.\n" "$input_file"
     exit 1
   fi
 
-  echo "Validating formatting for: $INPUT_FILE"
+  printf "Validating formatting for: %s\n" "$input_file"
   awk '
 BEGIN { error_count = 0 }
 {
@@ -59,8 +59,8 @@ END {
     exit 0
   }
 }
-' "$INPUT_FILE"
-  if [ $? -ne 0 ]; then
+' "$input_file"
+  if [[ $? -ne 0 ]]; then
     exit 1
   fi
 done

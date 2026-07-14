@@ -3,41 +3,85 @@
 set -e
 
 # Locate target directory
-TARGET_DIR=""
+target_dir=""
 # Try to follow symlinks to find original workspace
-REAL_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
-REAL_DIR=$(dirname "$REAL_PATH")
+real_path=$(readlink -f "$0" 2>/dev/null || echo "$0")
+real_dir=$(dirname "$real_path")
 
 # If running inside a Blaze snapshot, try to resolve to active workspace
-if [[ "$REAL_DIR" =~ ^(.*)/\.snapshot/[0-9]+/(.*)$ ]]; then
-  REAL_DIR="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+if [[ "$real_dir" =~ ^(.*)/\.snapshot/[0-9]+/(.*)$ ]]; then
+  real_dir="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
 fi
 
-for path in "$REAL_DIR" "${TEST_SRCDIR}/google3/learning/brain/research/kelvin/sim/coremark_test" "learning/brain/research/kelvin/sim/coremark_test" "$(dirname "$0")"; do
-  if [ -d "$path" ] && [ -f "$path/BUILD" ]; then
-    TARGET_DIR="$path"
+for path in "$real_dir" "${TEST_SRCDIR}/google3/learning/brain/research/kelvin/sim/coremark_test" "learning/brain/research/kelvin/sim/coremark_test" "$(dirname "$0")"; do
+  if [[ -d "$path" ]] && [[ -f "$path/BUILD" ]]; then
+    target_dir="$path"
     break
   fi
 done
 
-if [ -z "$TARGET_DIR" ]; then
-  echo "Error: Target directory not found."
+if [[ -z "$target_dir" ]]; then
+  printf "Error: Target directory not found.\n"
   exit 1
 fi
 
-echo "Checking for unexpected files in $TARGET_DIR..."
+test_files_dir="$(realpath "$target_dir/../test/testfiles")"
 
-# Whitelist of allowed files
-ALLOWED_FILES="(BUILD|coremark_builder.Dockerfile|build_unified_asm.sh|build_unified_elf.sh|run_validation.sh|diff_test.sh|validate_formatting.sh|crt0_vector_test.sh|run_validation_dynamic.sh|newlib_crt0_test.sh|workspace_clean_test.sh|test_ee_printf.sh|test_ee_printf.c|portable_malloc_test.sh|portable_malloc_test.c|coremark-builder.tar|coremark_unified.S|coremark_unified.elf|coremark_unified.map|coremark_unified.objdump|coremark_individual.elf|coremark_individual.map|coremark_individual.objdump|core_portme.S|core_list_join.S|core_state.S|core_main.S|core_util.S|core_matrix.S|build_indiv_asm.sh|update.sh)"
+printf "Checking for mandatory artifacts in %s...\n" "$test_files_dir"
+required_artifacts=("coremark_unified.map" "coremark_unified.S")
+for artifact in "${required_artifacts[@]}"; do
+  if [[ ! -f "$test_files_dir/$artifact" ]]; then
+    printf "Error: Mandatory artifact %s missing in %s\n" "$artifact" "$test_files_dir"
+    exit 1
+  fi
+done
 
-# Find all files in TARGET_DIR and filter out the allowed ones
-UNEXPECTED_FILES=$(find "$TARGET_DIR" -maxdepth 1 -type f -printf "%P\n" | grep -vE "^$ALLOWED_FILES\$" || true)
+# Check for stale detritus in target_dir
+printf "Checking for stale detritus in %s...\n" "$target_dir"
+target_detritus_patterns=(
+  "*.tmp"
+  "*.log"
+  "*.out"
+  "*.o"
+  "*.d"
+  "*.ii"
+  ".git/index.lock"
+  ".hg/store/lock"
+)
+for pattern in "${target_detritus_patterns[@]}"; do
+  if find "$target_dir" -type f -name "$pattern" | grep -q .; then
+    printf "Error: Found stale detritus in %s matching pattern '%s':\n" "$target_dir" "$pattern"
+    find "$target_dir" -type f -name "$pattern"
+    exit 1
+  fi
+done
 
-if [ -n "$UNEXPECTED_FILES" ]; then
-  echo "Error: Found unexpected files in $TARGET_DIR:"
-  echo "$UNEXPECTED_FILES"
-  exit 1
-fi
+printf "Checking for unexpected files in %s...\n" "$test_files_dir"
+# Define expected extensions that are allowed
+allowed_extensions=("S" "c" "h" "ld" "elf" "map" "sh" "py" "disassm" "bin" "awk")
+# required_artifacts are already defined
 
-echo "Workspace clean validation passed."
+# Find all files in the testfiles directory
+all_files=$(find "$test_files_dir" -type f)
+
+for file in $all_files; do
+  basename_file=$(basename "$file")
+  is_required=false
+  for required in "${required_artifacts[@]}"; do
+    if [[ "$basename_file" == "$required" ]]; then
+      is_required=true
+      break
+    fi
+  done
+
+  if [[ "$is_required" == false ]]; then
+    ext="${file##*.}"
+    if [[ ! " ${allowed_extensions[@]} " =~ " ${ext} " ]]; then
+      printf "Error: Found unexpected artifact: %s (Extension: %s)\n" "$file" "$ext"
+      exit 1
+    fi
+  fi
+done
+
+printf "Workspace clean validation passed.\n"
 exit 0

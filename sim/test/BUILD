@@ -30,6 +30,8 @@ exports_files(
         "testfiles/coremark_unified.map",
         "testfiles/crt0.S",
         "testfiles/disassm_to_header.awk",
+        "testfiles/gen_coremark_asm.sh",
+        "testfiles/gen_coremark_elf.sh",
         "testfiles/hello_world_mpause.bin",
         "testfiles/hello_world_mpause.elf",
         "testfiles/hello_world_rv32imf.elf",

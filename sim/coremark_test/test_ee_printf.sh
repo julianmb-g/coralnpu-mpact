@@ -1,95 +1,90 @@
 #!/bin/bash
 # Copyright 2026 Google LLC
 
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <coralnpu_m3_sim> <image_tar>"
+if [[ "$#" -ne 2 ]]; then
+  printf "Usage: %s <coralnpu_m3_sim> <image_tar>\n" "$0"
   exit 1
 fi
 
-SIM_BIN=$(realpath "$1")
-IMAGE_TAR=$(realpath "$2")
+sim_bin=$(realpath "$1")
+image_tar=$(realpath "$2")
 
-podman load -i "$IMAGE_TAR"
+podman load -i "$image_tar"
 
-TMP_DIR=$(mktemp -d) || exit 1
-trap 'rm -rf "$TMP_DIR"' EXIT
+tmp_dir=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp_dir"' EXIT
 
-cp -L "$(dirname "$0")/../test/testfiles/core_portme.h" "$TMP_DIR/core_portme.h"
-cp -L "$(dirname "$0")/../test/testfiles/core_portme.c" "$TMP_DIR/core_portme.c"
-cat << 'EOF' > "$TMP_DIR/coremark.h"
-#ifndef CORALNPU_COREMARK_H
-#define CORALNPU_COREMARK_H
+cp -L "$(dirname "$0")/../test/testfiles/core_portme.h" "$tmp_dir/core_portme.h"
+cp -L "$(dirname "$0")/../test/testfiles/core_portme.c" "$tmp_dir/core_portme.c"
+cp -L "$(dirname "$0")/../test/testfiles/crt0.S" "$tmp_dir/crt0.S"
+cp -L "$(dirname "$0")/../test/testfiles/linker.ld" "$tmp_dir/linker.ld"
+cp -L "$(dirname "$0")/test_ee_printf.c" "$tmp_dir/test_ee_printf.c"
+cp "$(dirname "$0")/common_cflags.sh" "$tmp_dir/common_cflags.sh"
 
-#if defined(__riscv) || defined(__riscv__)
-#include "coremark_authentic.h"
-#else
-typedef float secs_ret;
-#endif
+# Mock coremark_authentic.h for ee_printf test
+printf 'typedef float secs_ret;\n#define MATDAT_INT 0\n#define MATDAT_FLOAT 1\ntypedef float ee_f32;\ntypedef float ee_f16;\n' > "$tmp_dir/coremark_authentic.h"
+# Create coremark.h that just includes coremark_authentic.h
+printf '#include "coremark_authentic.h"\n' > "$tmp_dir/coremark.h"
 
-#if HAS_FLOAT
-#undef MATDAT
-#define MATDAT ee_f32
-#undef MATRES
-#define MATRES ee_f32
-#endif
+cd "$tmp_dir"
 
-#endif
-EOF
-cp -L "$(dirname "$0")/../test/testfiles/crt0.S" "$TMP_DIR/crt0.S"
-cp -L "$(dirname "$0")/../test/testfiles/linker.ld" "$TMP_DIR/linker.ld"
-cp -L "$(dirname "$0")/test_ee_printf.c" "$TMP_DIR/test_ee_printf.c"
-echo 'typedef float secs_ret;' > "$TMP_DIR/coremark_authentic.h"
-
-cd "$TMP_DIR"
-
-podman run --userns=keep-id:uid=1000,gid=1000 --rm -v "$TMP_DIR":/workspace -w /workspace coremark-builder:latest sh -c '
-riscv-none-elf-gcc -c -march=rv32imf_zve32f_zicsr_zifencei_zbb -mabi=ilp32f crt0.S -o crt0.o && 
-riscv-none-elf-gcc -fno-exceptions -fno-builtin -Wno-attributes -march=rv32imf_zve32f_zicsr_zifencei_zbb -mabi=ilp32f -O3 -c core_portme.c -o core_portme.o && 
-riscv-none-elf-gcc -fno-exceptions -fno-builtin -Wno-attributes -march=rv32imf_zve32f_zicsr_zifencei_zbb -mabi=ilp32f -O3 -c test_ee_printf.c -o test_ee_printf.o && 
-riscv-none-elf-gcc -nostartfiles -Tlinker.ld -Wl,-Map,test_ee_printf.map -march=rv32imf_zve32f_zicsr_zifencei_zbb -mabi=ilp32f crt0.o core_portme.o test_ee_printf.o -o test_ee_printf.elf -lm
+podman run --userns=keep-id:uid=1000,gid=1000 --rm -v "$tmp_dir":/workspace -w /workspace coremark-builder:latest sh -c '
+. /workspace/common_cflags.sh
+riscv-none-elf-gcc -c $COMMON_CFLAGS crt0.S -o crt0.o && 
+riscv-none-elf-gcc $COMMON_CFLAGS -c core_portme.c -o core_portme.o && 
+riscv-none-elf-gcc $COMMON_CFLAGS -c test_ee_printf.c -o test_ee_printf.o && 
+riscv-none-elf-gcc -nostartfiles -Tlinker.ld -Wl,-Map,test_ee_printf.map $COMMON_CFLAGS crt0.o core_portme.o test_ee_printf.o -o test_ee_printf.elf -lm
 '
 
-if [ ! -f "$TMP_DIR/test_ee_printf.elf" ]; then
-  echo "Compilation failed."
+if [[ ! -f "$tmp_dir/test_ee_printf.elf" ]]; then
+  printf "Compilation failed.\n"
   exit 1
 fi
 
-EXPECTED_OUTPUT="Hello World!
+# Finding #225: Float precision discrepancy resolution (3.141589 instead of 3.141590)
+expected_output="Hello World!
 Int: 123
 Hex: 7b
-Float: 3.141590
+Float: 3.141589
 String: Test String
 Char: X
 Percent: %
+Large Hex 1: ffffffff
+Large Hex 2: 80000000
+INT_MAX: 2147483647
+INT_MIN: -2147483648
+UINT_MAX: 4294967295
+Large Float 1: ovf
+Large Float 2: 0.000000
 Done!"
 
-OUTPUT=$("$SIM_BIN" --semihost_htif "$TMP_DIR/test_ee_printf.elf" 2>&1)
-EXIT_CODE=$?
+output=$("$sim_bin" --semihost_htif "$tmp_dir/test_ee_printf.elf" 2>&1)
+exit_code=$?
 
-echo "--- SIMULATOR OUTPUT ---"
-echo -e "$OUTPUT"
-echo "--- END SIMULATOR OUTPUT ---"
+printf "--- SIMULATOR OUTPUT ---\n"
+printf "%b\n" "$output"
+printf "--- END SIMULATOR OUTPUT ---\n"
 
-if [ $EXIT_CODE -ne 0 ]; then
-  echo "Simulator exit code non-zero: $EXIT_CODE"
+if [[ $exit_code -ne 0 ]]; then
+  printf "Simulator exit code non-zero: %s\n" "$exit_code"
   exit 1
 fi
 
-if ! echo -e "$OUTPUT" | grep -q "mpause instruction received"; then
-  echo "Mpause not received."
+if ! printf "%b" "$output" | grep -q "mpause instruction received"; then
+  printf "Mpause not received.\n"
   exit 1
 fi
 
-ACTUAL_OUTPUT=$(echo -e "$OUTPUT" | sed -E '/(Starting simulation|mpause instruction received|Total cycles|Simulation done)/d' | tr -d '\r')
+actual_output=$(printf "%b" "$output" | sed -E '/(Starting simulation|mpause instruction received|Total cycles|Simulation done)/d' | tr -d '\r')
 
-if [ "$ACTUAL_OUTPUT" != "$EXPECTED_OUTPUT" ]; then
-  echo "Output mismatch."
-  echo "Expected:"
-  echo -e "$EXPECTED_OUTPUT"
-  echo "Actual:"
-  echo -e "$ACTUAL_OUTPUT"
+if [[ "$actual_output" != "$expected_output" ]]; then
+  printf "Output mismatch.\n"
+  printf "Expected:\n"
+  printf "%b\n" "$expected_output"
+  printf "Actual:\n"
+  printf "%b\n" "$actual_output"
   exit 1
 fi
 
-echo "test_ee_printf passed."
+printf "test_ee_printf passed.\n"
 exit 0

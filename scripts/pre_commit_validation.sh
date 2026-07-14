@@ -19,3 +19,6 @@ bazel build ${BAZEL_BUILD_FLAGS} -- //... -//sim/coremark_test/...
 
 echo "=== Running bazel test ==="
 bazel test ${BAZEL_TEST_FLAGS} --test_output=errors -- //... -//sim/coremark_test/...
+
+echo "=== Running bazel test for coremark_test ==="
+bazel test ${BAZEL_BUILD_FLAGS} ${BAZEL_TEST_FLAGS} --build_tests_only --test_output=errors -- //sim/coremark_test/... || [ $? -eq 4 ]

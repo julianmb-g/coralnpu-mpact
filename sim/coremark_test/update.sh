@@ -1,20 +1,20 @@
 #!/bin/bash
 set -e
 
-WORKSPACE_DIR="$(blaze info workspace)"
-cd "$WORKSPACE_DIR"
+workspace_dir="$(blaze info workspace)"
+cd "$workspace_dir"
 
-echo "Building coremark_unified_elf..."
+printf "Building coremark_unified_elf...\n"
 blaze build //learning/brain/research/kelvin/sim/coremark_test:coremark_unified_elf
 
-GENFILES_DIR="$(blaze info blaze-genfiles)"
+genfiles_dir="$(blaze info blaze-genfiles)"
 
-echo "Copying generated assembly to sim/test/testfiles/coremark_unified.S..."
-cp -f "$GENFILES_DIR/learning/brain/research/kelvin/sim/coremark_test/coremark_unified.S" \
+printf "Copying generated assembly to sim/test/testfiles/coremark_unified.S...\n"
+cp -f "$genfiles_dir/learning/brain/research/kelvin/sim/coremark_test/coremark_unified.S" \
   learning/brain/research/kelvin/sim/test/testfiles/coremark_unified.S
 
-echo "Copying generated map to sim/test/testfiles/coremark_unified.map..."
-cp -f "$GENFILES_DIR/learning/brain/research/kelvin/sim/coremark_test/coremark_unified.map" \
+printf "Copying generated map to sim/test/testfiles/coremark_unified.map...\n"
+cp -f "$genfiles_dir/learning/brain/research/kelvin/sim/coremark_test/coremark_unified.map" \
   learning/brain/research/kelvin/sim/test/testfiles/coremark_unified.map
 
-echo "Done."
+printf "Done.\n"

@@ -12,7 +12,11 @@ _start:
   j 1b
 2:
   // Enable FPU and Vector Unit
-  li t0, 0x00006600
+.set MSTATUS_FS_SHIFT, 13
+.set MSTATUS_VS_SHIFT, 9
+.set MSTATUS_DIRTY, 3
+.set MSTATUS_ENABLE_FPU_VECTOR, (MSTATUS_DIRTY << MSTATUS_FS_SHIFT) | (MSTATUS_DIRTY << MSTATUS_VS_SHIFT)
+  li t0, MSTATUS_ENABLE_FPU_VECTOR
   csrs mstatus, t0
 
   // Initialize Vector Registers
