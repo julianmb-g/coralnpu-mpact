@@ -1779,6 +1779,82 @@ TEST_F(CoralNPUVectorInstructionsTest, Vfncvtbf16ffwBasicExecution) {
   EXPECT_EQ(dest_span[0], 0x3F80);
 }
 
+TEST_F(CoralNPUVectorInstructionsTest, Vfwcvtbf16ffvLmulConstraintTest) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(9);  // LMUL != 1
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/1, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/true, {10});
+  coralnpu::sim::Vfwcvtbf16ffv(&inst);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfncvtbf16ffwLmulConstraintTest) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(9);  // LMUL != 1
+  Instruction inst(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst, /*num_ops=*/1, /*src1_widen_factor=*/2, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/false, {10});
+  coralnpu::sim::Vfncvtbf16ffw(&inst);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfwcvtbf16ffvAlignmentConstraintTest) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+  
+  // Test odd destination register
+  Instruction inst1(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst1, /*num_ops=*/1, /*src1_widen_factor=*/1, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/true, {11});
+  coralnpu::sim::Vfwcvtbf16ffv(&inst1);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+
+  // Test odd source register
+  Instruction inst2(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst2, /*num_ops=*/1, /*src1_widen_factor=*/1, 9,
+                               /*other_sources=*/{}, /*widen_dst=*/true, {10});
+  coralnpu::sim::Vfwcvtbf16ffv(&inst2);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+}
+
+TEST_F(CoralNPUVectorInstructionsTest, Vfncvtbf16ffwAlignmentConstraintTest) {
+  auto* rv_vector = state_->rv_vector();
+  rv_vector->SetVectorType(8);  // SEW=16, LMUL=1
+  
+  // Test odd destination register
+  Instruction inst1(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst1, /*num_ops=*/1, /*src1_widen_factor=*/2, 8,
+                               /*other_sources=*/{}, /*widen_dst=*/false, {11});
+  coralnpu::sim::Vfncvtbf16ffw(&inst1);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+
+  // Test odd source register
+  Instruction inst2(coralnpu::sim::test::kInstAddress, state_);
+  AppendVectorRegisterOperands(&inst2, /*num_ops=*/1, /*src1_widen_factor=*/2, 9,
+                               /*other_sources=*/{}, /*widen_dst=*/false, {10});
+  coralnpu::sim::Vfncvtbf16ffw(&inst2);
+  EXPECT_EQ(state_->mcause()->AsUint64(),
+            static_cast<uint64_t>(
+                mpact::sim::riscv::ExceptionCode::kIllegalInstruction));
+  state_->mcause()->Write(0u);
+}
+
 TEST_F(CoralNPUVectorInstructionsTest, Vfwcvtbf16ffvBasicExecution) {
   auto* rv_vector = state_->rv_vector();
   rv_vector->SetVectorType(8);  // SEW=16, LMUL=1

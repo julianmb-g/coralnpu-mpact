@@ -87,10 +87,22 @@ bool CheckMaskOverlap(int num_regs_dst, CoralNPUState* state,
   return false;
 }
 
+int GetRegisterNumber(const std::string& name) {
+  if (name.empty() || name[0] != 'v') return -1;
+  auto dot_pos = name.find('.');
+  int reg_num = -1;
+  if (!absl::SimpleAtoi(name.substr(1, dot_pos - 1), &reg_num)) return -1;
+  return reg_num;
+}
+
 bool CheckZvfbfminVectorOpConstraints(CoralNPUState* state, Instruction* inst,
                                       bool check_rounding) {
   if ((state->rv_vector()->vtype() & 0x80000000) != 0) {
     LOG(INFO) << "Zvfbfmin constraints: vill trap";
+    return false;
+  }
+  if ((state->rv_vector()->vtype() & 0x07) != 0) {
+    LOG(INFO) << "Zvfbfmin constraints: LMUL != 1 trap";
     return false;
   }
   if (check_rounding) {
@@ -100,6 +112,23 @@ bool CheckZvfbfminVectorOpConstraints(CoralNPUState* state, Instruction* inst,
       return false;
     }
   }
+
+  auto* dest_op = static_cast<mpact::sim::riscv::RV32VectorDestinationOperand*>(
+      inst->Destination(0));
+  auto* src_op =
+      static_cast<mpact::sim::riscv::RV32VectorSourceOperand*>(inst->Source(0));
+
+  auto* dest_reg = std::any_cast<mpact::sim::generic::RegisterBase*>(dest_op->GetObject(0));
+  auto* src_reg = src_op->GetRegister(0);
+
+  int dest_num = GetRegisterNumber(dest_reg->name());
+  int src_num = GetRegisterNumber(src_reg->name());
+
+  if (dest_num < 0 || src_num < 0 || (dest_num % 2 != 0) || (src_num % 2 != 0)) {
+    LOG(INFO) << "Zvfbfmin constraints: alignment trap";
+    return false;
+  }
+
   return true;
 }
 
