@@ -21,6 +21,35 @@
 #include "sim/coralnpu_enums.h"
 #include "sim/coralnpu_state.h"
 #include "googletest/include/gtest/gtest.h"
+#include "googlemock/include/gmock/gmock.h"
+#ifndef ABSL_EXPECT_OK
+#define ABSL_EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ABSL_ASSERT_OK
+#define ABSL_ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef EXPECT_OK
+#define EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ASSERT_OK
+#define ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef KELVIN_TEST_MATCHERS_DEFINED
+#define KELVIN_TEST_MATCHERS_DEFINED
+namespace absl_testing {
+MATCHER(IsOk, "") { return arg.ok(); }
+template <typename M>
+inline auto IsOkAndHolds(M matcher) {
+  return ::testing::AllOf(
+      ::testing::ResultOf([](const auto& s) { return s.ok(); }, ::testing::IsTrue()),
+      ::testing::ResultOf([](const auto& s) -> const auto& { return *s; }, matcher));
+}
+}  // namespace absl_testing
+namespace testing::status {
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
+}  // namespace testing::status
+#endif
 #include "riscv/riscv_register.h"
 #include "riscv/riscv_state.h"
 #include "mpact/sim/generic/register.h"
@@ -156,8 +185,8 @@ class CoralNPUEncodingTest : public testing::Test {
   T* EncodeOpHelper(uint32_t inst_word, OpcodeEnum opcode, std::any op) const {
     enc_->ParseInstruction(inst_word);
     EXPECT_EQ(enc_->GetOpcode(SlotEnum::kCoralnpu, 0), opcode);
-    if (std::is_same<T, RV32SourceOperand>::value ||
-        std::is_same<T, RV32VectorSourceOperand>::value) {
+    if (std::is_same_v<T, RV32SourceOperand> ||
+        std::is_same_v<T, RV32VectorSourceOperand>) {
       auto* source = enc_->GetSource(SlotEnum::kCoralnpu, 0, opcode,
                                      std::any_cast<SourceOpEnum>(op), 0);
       return reinterpret_cast<T*>(source);

@@ -21,6 +21,35 @@
 #include "sim/test/align_test_generated.h"
 #include "sim/test/frm_test_generated.h"
 #include "googletest/include/gtest/gtest.h"
+#include "googlemock/include/gmock/gmock.h"
+#ifndef ABSL_EXPECT_OK
+#define ABSL_EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ABSL_ASSERT_OK
+#define ABSL_ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef EXPECT_OK
+#define EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ASSERT_OK
+#define ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef KELVIN_TEST_MATCHERS_DEFINED
+#define KELVIN_TEST_MATCHERS_DEFINED
+namespace absl_testing {
+MATCHER(IsOk, "") { return arg.ok(); }
+template <typename M>
+inline auto IsOkAndHolds(M matcher) {
+  return ::testing::AllOf(
+      ::testing::ResultOf([](const auto& s) { return s.ok(); }, ::testing::IsTrue()),
+      ::testing::ResultOf([](const auto& s) -> const auto& { return *s; }, matcher));
+}
+}  // namespace absl_testing
+namespace testing::status {
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
+}  // namespace testing::status
+#endif
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_format.h"
 #include "external/svdpi_h_file/file/svdpi.h"

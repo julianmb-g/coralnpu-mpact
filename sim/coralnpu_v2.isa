@@ -28,7 +28,7 @@ isa CoralNPUV2 {
 // Basic integer ALU instructions, part of the RiscV 32i subset.
 slot riscv32i {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_i_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_i_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -222,7 +222,7 @@ slot riscv32i {
 // changed to provide performance hints to a simulated microarchitecture.
 slot riscv32_hints {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_i_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_i_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -369,7 +369,7 @@ slot riscv32_hints {
 // Instruction fence.
 slot zfencei {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_zfencei_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_zfencei_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -383,7 +383,7 @@ slot zfencei {
 // RiscV32 multiply/divide instructions.
 slot riscv32m {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_m_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_m_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -428,7 +428,7 @@ slot riscv32m {
 // RiscV32 CSR manipulation instructions.
 slot zicsr {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_zicsr_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_zicsr_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -506,7 +506,7 @@ slot zicsr {
 // RiscV32 F (single precision floating point) instructions.
 slot riscv32f {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_f_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_f_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -627,7 +627,7 @@ slot riscv32f {
 // included for CoralNPU V2.
 slot privileged {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_priv_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_priv_instructions.h"
   }
   default size = 4;
   default latency = global_latency;
@@ -646,7 +646,7 @@ slot riscv32_zbb {
   resources TwoOp = { next_pc, rs1 : rd[..rd]};
   resources ThreeOp = { next_pc, rs1, rs2 : rd[..rd]};
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_bitmanip_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_bitmanip_instructions.h"
   }
 
   opcodes {
@@ -743,12 +743,12 @@ slot riscv32_zbb_imm {
 
 slot riscv_zve32x {
   includes {
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_memory_instructions.h"
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_opi_instructions.h"
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_opm_instructions.h"
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_permute_instructions.h"
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_reduction_instructions.h"
-    #include "external/com_google_mpact-riscv/riscv/riscv_vector_unary_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_memory_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_opi_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_opm_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_permute_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_reduction_instructions.h"
+    #include "external/mpact-riscv+/riscv/riscv_vector_unary_instructions.h"
     #include "absl/functional/bind_front.h"
   }
   default size = 4;

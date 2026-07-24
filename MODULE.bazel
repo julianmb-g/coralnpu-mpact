@@ -1,0 +1,52 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+module(
+    name = "coralnpu_sim",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "mpact-riscv", version = "1.0.1")
+bazel_dep(name = "mpact-sim", version = "1.0.2")
+bazel_dep(name = "abseil-cpp", version = "20240116.2")
+bazel_dep(name = "protobuf", version = "29.0", repo_name = "com_google_protobuf")
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1", repo_name = "com_google_googletest")
+bazel_dep(name = "re2", version = "2023-11-01", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_license", version = "1.0.0")
+bazel_dep(name = "rules_cc", version = "0.1.3")
+
+archive_override(
+    module_name = "mpact-riscv",
+    urls = ["https://github.com/google/mpact-riscv/archive/949e6453f7c8409e47db50d9bd1d3651a1985223.tar.gz"],
+    strip_prefix = "mpact-riscv-949e6453f7c8409e47db50d9bd1d3651a1985223",
+    integrity = "sha256-wPD3LabDh7sxwjdmtuUWwlvg1CX4VBMvI2DjVp95zzI=",
+    patches = ["//:mpact_riscv_zvt.patch"],
+    patch_strip = 1,
+)
+
+archive_override(
+    module_name = "mpact-sim",
+    urls = ["https://github.com/google/mpact-sim/archive/cc31f794a6f30b2d18f1ee048ca6a61895e1fb73.tar.gz"],
+    strip_prefix = "mpact-sim-cc31f794a6f30b2d18f1ee048ca6a61895e1fb73",
+    integrity = "sha256-REShIrJIYFkMfO0eOHWlz02K78vK9WBXaj5M+W9UM6Q=",
+)
+
+sim_deps = use_extension(
+    "@mpact-sim//:extensions.bzl",
+    "non_module_deps",
+)
+use_repo(
+    sim_deps,
+    "com_github_serge1_elfio",
+)

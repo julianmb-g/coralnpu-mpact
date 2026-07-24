@@ -1,0 +1,1533 @@
+diff -Naur a/riscv/BUILD b/riscv/BUILD
+--- a/riscv/BUILD	2026-06-15 20:21:03.000000000 +0000
++++ b/riscv/BUILD	2026-07-24 01:14:41.876640916 +0000
+@@ -23,7 +23,14 @@
+     default_visibility = ["//visibility:public"],
+ )
+ 
++# LICENSE_REMOVED
++
+ exports_files([
++    "riscv_zvt.isa",
++    "riscv_zvt.bin_fmt",
++    "riscv_zicbom.isa",
++    "riscv_zicbom.bin_fmt",
++    "LICENSE",
+     "riscv32g.bin_fmt",
+     "riscv32g.isa",
+     "riscv32gzb.bin_fmt",
+@@ -282,16 +289,16 @@
+     srcs = [
+         "riscv_zc_instructions.cc",
+         "riscv_zhintpause_instructions.cc",
++        "riscv_zicbom_instructions.cc",
+         "riscv_zicbop_instructions.cc",
+-        "riscv_zicond_instructions.cc",
+         "riscv_zihintntl_instructions.cc",
+         "riscv_zimop_instructions.cc",
+     ],
+     hdrs = [
+         "riscv_zc_instructions.h",
+         "riscv_zhintpause_instructions.h",
++        "riscv_zicbom_instructions.h",
+         "riscv_zicbop_instructions.h",
+-        "riscv_zicond_instructions.h",
+         "riscv_zihintntl_instructions.h",
+         "riscv_zimop_instructions.h",
+     ],
+@@ -497,6 +504,7 @@
+         "riscv_vector.isa",
+         "riscv_zc.isa",
+         "riscv_zhintpause.isa",
++        "riscv_zicbom.isa",
+         "riscv_zicbop.isa",
+         "riscv_zicond.isa",
+         "riscv_zihintntl.isa",
+@@ -525,6 +533,7 @@
+         "riscv_format32.bin_fmt",
+         "riscv_zc.bin_fmt",
+         "riscv_zhintpause.bin_fmt",
++        "riscv_zicbom.bin_fmt",
+         "riscv_zicbop.bin_fmt",
+         "riscv_zicond.bin_fmt",
+         "riscv_zihintntl.bin_fmt",
+@@ -1720,3 +1729,52 @@
+         "@mpact-sim//mpact/sim/util/renode:renode_debug_interface",
+     ],
+ )
++
++cc_library(
++    name = "riscv_zvt_state",
++    srcs = ["riscv_zvt_state.cc"],
++    hdrs = ["riscv_zvt_state.h"],
++    copts = ["-O3"],
++    deps = [
++        ":riscv_state",
++        "@abseil-cpp//absl/base:nullability",
++        "@abseil-cpp//absl/log",
++        "@abseil-cpp//absl/log:check",
++        "@abseil-cpp//absl/memory",
++        "@abseil-cpp//absl/status:statusor",
++        "@mpact-sim//mpact/sim/generic:core",
++        "@mpact-sim//mpact/sim/generic:instruction",
++    ],
++)
++
++cc_library(
++    name = "riscv_zvt_instructions",
++    srcs = ["riscv_zvt_instructions.cc"],
++    hdrs = ["riscv_zvt_instructions.h"],
++    copts = ["-O3"],
++    deps = [
++        ":riscv_state",
++        ":riscv_zvt_state",
++        "@abseil-cpp//absl/base",
++        "@abseil-cpp//absl/log:check",
++        "@abseil-cpp//absl/types:span",
++        "@mpact-sim//mpact/sim/generic:core",
++        "@mpact-sim//mpact/sim/generic:instruction",
++    ],
++)
++
++cc_library(
++    name = "riscv_zvt_getters",
++    hdrs = ["riscv_zvt_getters.h"],
++    copts = ["-O3"],
++    deps = [
++        ":riscv_encoding_common",
++        ":riscv_getters",
++        ":riscv_state",
++        "@abseil-cpp//absl/strings",
++        "@abseil-cpp//absl/types:span",
++        "@mpact-sim//mpact/sim/generic:arch_state",
++        "@mpact-sim//mpact/sim/generic:core",
++        "@mpact-sim//mpact/sim/generic:type_helpers",
++    ],
++)
+diff -Naur a/riscv/riscv_format32.bin_fmt b/riscv/riscv_format32.bin_fmt
+--- a/riscv/riscv_format32.bin_fmt	2026-06-15 20:21:03.000000000 +0000
++++ b/riscv/riscv_format32.bin_fmt	2026-06-26 00:06:35.000000000 +0000
+@@ -241,3 +241,20 @@
+     unsigned uimm5[5] = rs1;
+     unsigned rs2[5] = top12[4..0];
+ };
++
++// Matrix-multiply format (OP-VE). Same field layout as VArith but the rd field
++// carries the destination tile (MSBs) and an "alt format" bit (LSB).
++format VMatrix[32] : Inst32Format {
++  fields:
++    unsigned func6[6];
++    unsigned vm[1];
++    unsigned vs2[5];
++    unsigned vs1[5];
++    unsigned func3[3];
++    unsigned mtd[5];
++    unsigned opcode[7];
++  overlays:
++    unsigned alt[1] = mtd[0];
++    // Named tile index (mt0..mt15): rd[11:8], i.e. mtd[4..1].
++    unsigned mtile[4] = mtd[4..1];
++};
+diff -Naur a/riscv/riscv_zicbom.bin_fmt b/riscv/riscv_zicbom.bin_fmt
+--- a/riscv/riscv_zicbom.bin_fmt	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zicbom.bin_fmt	2026-07-24 01:14:41.528641213 +0000
+@@ -0,0 +1,24 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// This file defines the encoding for the cache block management instructions in the
++// Zicbom extension.
++
++#include "riscv_format32.bin_fmt"
++
++instruction group RiscVZicbom[32] : Inst32Format {
++  cbo_clean : IType : u_imm12 == 0b0000'0000'0001, rd == 0b00000, func3 == 0b010, opcode == 0b000'1111;
++  cbo_flush : IType : u_imm12 == 0b0000'0000'0010, rd == 0b00000, func3 == 0b010, opcode == 0b000'1111;
++  cbo_inval : IType : u_imm12 == 0b0000'0000'0000, rd == 0b00000, func3 == 0b010, opcode == 0b000'1111;
++}
+diff -Naur a/riscv/riscv_zicbom_instructions.cc b/riscv/riscv_zicbom_instructions.cc
+--- a/riscv/riscv_zicbom_instructions.cc	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zicbom_instructions.cc	2026-07-24 01:14:41.556641189 +0000
+@@ -0,0 +1,43 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "riscv/riscv_zicbom_instructions.h"
++
++#include "mpact/sim/generic/instruction.h"
++
++// This file contains the definitions of the instruction semantic functions
++// for the cache block management instructions in the Zicbom extension.
++// For now, these instructions are implemented as no-ops.
++
++namespace mpact::sim::riscv {
++
++using ::mpact::sim::generic::Instruction;
++
++namespace RV32 {
++
++void RiscVCboClean(const Instruction* inst) { /* empty */ }
++void RiscVCboFlush(const Instruction* inst) { /* empty */ }
++void RiscVCboInval(const Instruction* inst) { /* empty */ }
++
++}  // namespace RV32
++
++namespace RV64 {
++
++void RiscVCboClean(const Instruction* inst) { /* empty */ }
++void RiscVCboFlush(const Instruction* inst) { /* empty */ }
++void RiscVCboInval(const Instruction* inst) { /* empty */ }
++
++}  // namespace RV64
++
++}  // namespace mpact::sim::riscv
+diff -Naur a/riscv/riscv_zicbom_instructions.h b/riscv/riscv_zicbom_instructions.h
+--- a/riscv/riscv_zicbom_instructions.h	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zicbom_instructions.h	2026-07-24 01:14:41.552641193 +0000
+@@ -0,0 +1,49 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef THIRD_PARTY_MPACT_RISCV_RISCV_ZICBOM_INSTRUCTIONS_H_
++#define THIRD_PARTY_MPACT_RISCV_RISCV_ZICBOM_INSTRUCTIONS_H_
++
++#include "mpact/sim/generic/instruction.h"
++
++// This file contains the declarations of the instruction semantic functions
++// for the cache block management instructions in the Zicbom extension.
++
++namespace mpact::sim::riscv {
++
++using ::mpact::sim::generic::Instruction;
++
++namespace RV32 {
++
++// Each of these instructions takes one source operand: rs1, which contains the
++// base address of the cache block to be cleaned, flushed, or invalidated.
++void RiscVCboClean(const Instruction* inst);
++void RiscVCboFlush(const Instruction* inst);
++void RiscVCboInval(const Instruction* inst);
++
++}  // namespace RV32
++
++namespace RV64 {
++
++// Each of these instructions takes one source operand: rs1, which contains the
++// base address of the cache block to be cleaned, flushed, or invalidated.
++void RiscVCboClean(const Instruction* inst);
++void RiscVCboFlush(const Instruction* inst);
++void RiscVCboInval(const Instruction* inst);
++
++}  // namespace RV64
++
++}  // namespace mpact::sim::riscv
++
++#endif  // THIRD_PARTY_MPACT_RISCV_RISCV_ZICBOM_INSTRUCTIONS_H_
+diff -Naur a/riscv/riscv_zicbom.isa b/riscv/riscv_zicbom.isa
+--- a/riscv/riscv_zicbom.isa	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zicbom.isa	2026-07-24 01:14:41.516641223 +0000
+@@ -0,0 +1,48 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// This file defines the cache block management instructions in the Zicbom extension.
++
++slot riscv_zicbom32 {
++  includes {
++    #include "riscv/riscv_zicbom_instructions.h"
++  }
++  default size = 4;
++  opcodes {
++    cbo_clean{: rs1 :},
++      resources: { rs1 :},
++      disasm: "cbo.clean", "0(%rs1)",
++      semfunc: "&RV32::RiscVCboClean";
++    cbo_flush{: rs1 :},
++      resources: { rs1 :},
++      disasm: "cbo.flush", "0(%rs1)",
++      semfunc: "&RV32::RiscVCboFlush";
++    cbo_inval{: rs1 :},
++      resources: { rs1 :},
++      disasm: "cbo.inval", "0(%rs1)",
++      semfunc: "&RV32::RiscVCboInval";
++  }
++}
++
++slot riscv_zicbom64 : riscv_zicbom32 {
++  includes {
++    #include "riscv/riscv_zicbom_instructions.h"
++  }
++  default size = 4;
++  opcodes {
++    cbo_clean = override, semfunc: "&RV64::RiscVCboClean";
++    cbo_flush = override, semfunc: "&RV64::RiscVCboFlush";
++    cbo_inval = override, semfunc: "&RV64::RiscVCboInval";
++  }
++}
+diff -Naur a/riscv/riscv_zvt.bin_fmt b/riscv/riscv_zvt.bin_fmt
+--- a/riscv/riscv_zvt.bin_fmt	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt.bin_fmt	2026-06-26 00:06:35.000000000 +0000
+@@ -0,0 +1,50 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Matrix configuration instructions, encoded in the vector-configuration
++// (OP-V) major opcode like the vset* family (spec 15.1.1.4). They are
++// distinguished from vsetvl (func7 == 0b100'0000) by func7:
++//   msetmtype       func7 == 0b100'0001
++// msettn/tm/tk    func7 == 0b100'0010, selected by the low rs2 bits.
++
++instruction group RiscVZvtInst32[32] : Inst32Format {
++  msetmtype     : VConfig : func7 == 0b100'0001,                 func3 == 0b111, opcode == 0b101'0111;
++  msettn        : VConfig : func7 == 0b100'0010, rs2 == 0b00000, func3 == 0b111, opcode == 0b101'0111;
++  msettm        : VConfig : func7 == 0b100'0010, rs2 == 0b00001, func3 == 0b111, opcode == 0b101'0111;
++  msettk        : VConfig : func7 == 0b100'0010, rs2 == 0b00010, func3 == 0b111, opcode == 0b101'0111;
++
++  // Tile manipulation (OP-V, func3 == 0b110).
++  vtmv_v_t      : VArith : func6 == 0b010'000, vs2 == 0b11111, func3 == 0b110, opcode == 0b101'0111;
++  vtmv_t_v      : VArith : func6 == 0b010'111,                 func3 == 0b110, opcode == 0b101'0111;
++  vtzero        : VArith : func6 == 0b010'000, vs2 == 0b11110, vs1 == 0b00000, func3 == 0b110, opcode == 0b101'0111;
++  vtdiscard     : VArith : func6 == 0b010'000, vs2 == 0b11100, vs1 == 0b00000, func3 == 0b110, opcode == 0b101'0111;
++
++  // Tile load/store to memory (LOAD-FP / STORE-FP, mew == 1, width == 0b111;
++  // the nf field selects EEW: 0->8, 1->16, 2->32, 3->64).
++  vtle8         : VMem : nf == 0b000, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b000'0111;
++  vtle16        : VMem : nf == 0b001, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b000'0111;
++  vtle32        : VMem : nf == 0b010, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b000'0111;
++  vtle64        : VMem : nf == 0b011, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b000'0111;
++  vtse8         : VMem : nf == 0b000, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b010'0111;
++  vtse16        : VMem : nf == 0b001, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b010'0111;
++  vtse32        : VMem : nf == 0b010, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b010'0111;
++  vtse64        : VMem : nf == 0b011, mew == 0b1, mop == 0b00, vm == 0b1, width == 0b111, opcode == 0b010'0111;
++
++  // Matrix multiply (OP-VE, func6 == 0b111100). func3 selects int(000)/fp(001);
++  // the alt bit selects the alternate datatype variant.
++  vtmmu_tvv     : VMatrix : func6 == 0b111'100, func3 == 0b000, alt == 0b0, opcode == 0b111'0111;
++  vtmms_tvv     : VMatrix : func6 == 0b111'100, func3 == 0b000, alt == 0b1, opcode == 0b111'0111;
++  vtfmm_tvv     : VMatrix : func6 == 0b111'100, func3 == 0b001, alt == 0b0, opcode == 0b111'0111;
++  vtfmm_alt_tvv : VMatrix : func6 == 0b111'100, func3 == 0b001, alt == 0b1, opcode == 0b111'0111;
++};
+diff -Naur a/riscv/riscv_zvt_getters.h b/riscv/riscv_zvt_getters.h
+--- a/riscv/riscv_zvt_getters.h	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt_getters.h	2026-07-24 01:14:43.100639872 +0000
+@@ -0,0 +1,133 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Operand getters specific to the Zvt (matrix) instructions. These supplement
++// the RISC-V V getters: the Zvt encoding constructor calls both. The new
++// operands are the A/B matrix register groups, the tile destination specifier,
++// and a vector group destination for tile<->vector moves.
++
++#ifndef THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_GETTERS_H_
++#define THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_GETTERS_H_
++
++#include <algorithm>
++#include <cstdint>
++#include <vector>
++
++#include "absl/strings/str_cat.h"
++#include "absl/types/span.h"
++#include "mpact/sim/generic/immediate_operand.h"
++#include "mpact/sim/generic/operand_interface.h"
++#include "mpact/sim/generic/register.h"
++#include "mpact/sim/generic/type_helpers.h"
++#include "riscv/riscv_encoding_common.h"
++#include "riscv/riscv_getter_helpers.h"
++#include "riscv/riscv_register.h"
++#include "riscv/riscv_state.h"
++
++namespace mpact::sim::riscv {
++
++// Builds a source operand spanning `num_regs` consecutive vector registers
++// starting at `reg_num` (clamped to the register file). Unlike the stock
++// vs1/vs2 getters, the group size is explicit rather than inferred from the
++// register-number alignment, which the strided matrix row layout requires.
++template <typename RegType>
++::mpact::sim::generic::SourceOperandInterface* GetVectorGroupSourceOp(
++    ::mpact::sim::riscv::RiscVState* state, int reg_num, int num_regs) {
++  std::vector<::mpact::sim::generic::RegisterBase*> group;
++  group.reserve(std::min(num_regs, 32 - reg_num));
++  for (int i = 0; i < num_regs && (reg_num + i) < 32; ++i) {
++    auto [reg, unused] = state->GetRegister<RegType>(absl::StrCat(
++        ::mpact::sim::riscv::RiscVState::kVregPrefix, reg_num + i));
++    group.push_back(reg);
++  }
++  return new ::mpact::sim::riscv::RV32VectorSourceOperand(
++      absl::Span<::mpact::sim::generic::RegisterBase*>(group),
++      absl::StrCat(::mpact::sim::riscv::RiscVState::kVregPrefix, reg_num));
++}
++
++// Builds a destination operand spanning `num_regs` consecutive vector
++// registers starting at `reg_num` (clamped to the register file).
++template <typename RegType>
++::mpact::sim::generic::DestinationOperandInterface* GetVectorGroupDestinationOp(
++    ::mpact::sim::riscv::RiscVState* state, int latency, int reg_num,
++    int num_regs) {
++  std::vector<::mpact::sim::generic::RegisterBase*> group;
++  group.reserve(std::min(num_regs, 32 - reg_num));
++  for (int i = 0; i < num_regs && (reg_num + i) < 32; ++i) {
++    auto [reg, unused] = state->GetRegister<RegType>(absl::StrCat(
++        ::mpact::sim::riscv::RiscVState::kVregPrefix, reg_num + i));
++    group.push_back(reg);
++  }
++  return new ::mpact::sim::riscv::RV32VectorDestinationOperand(
++      absl::Span<::mpact::sim::generic::RegisterBase*>(group), latency,
++      absl::StrCat(::mpact::sim::riscv::RiscVState::kVregPrefix, reg_num));
++}
++
++// The maximum vector-register window a matrix operand row group can span (one
++// eight-register group, per spec 15.1.1.3).
++inline constexpr int kRiscVZvtMatrixGroupRegs = 8;
++
++template <typename SourceOpEnum, typename Extractors>
++void AddRiscVZvtSourceGetters(
++    ::mpact::sim::riscv::SourceOpGetterMap& getter_map,
++    ::mpact::sim::riscv::RiscVEncodingCommon* common) {
++  using ::mpact::sim::generic::ImmediateOperand;
++  using ::mpact::sim::generic::SourceOperandInterface;
++  using ::mpact::sim::generic::operator*;  // NOLINT
++  using ::mpact::sim::riscv::Insert;
++  using ::mpact::sim::riscv::RVVectorRegister;
++
++  // A matrix operand: vector register group based at vs2.
++  Insert(getter_map, *SourceOpEnum::kMatA,
++         [common]() -> SourceOperandInterface* {
++           int num = Extractors::VMatrix::ExtractVs2(common->inst_word());
++           return GetVectorGroupSourceOp<RVVectorRegister>(
++               common->state(), num, kRiscVZvtMatrixGroupRegs);
++         });
++  // B matrix operand: vector register group based at vs1.
++  Insert(getter_map, *SourceOpEnum::kMatB,
++         [common]() -> SourceOperandInterface* {
++           int num = Extractors::VMatrix::ExtractVs1(common->inst_word());
++           return GetVectorGroupSourceOp<RVVectorRegister>(
++               common->state(), num, kRiscVZvtMatrixGroupRegs);
++         });
++  // Destination tile specifier (named tile index, 0..15) from the rd MSBs.
++  Insert(getter_map, *SourceOpEnum::kMtd,
++         [common]() -> SourceOperandInterface* {
++           int tile = Extractors::VMatrix::ExtractMtile(common->inst_word());
++           return new ImmediateOperand<uint32_t>(tile);
++         });
++}
++
++template <typename DestOpEnum, typename Extractors>
++void AddRiscVZvtDestGetters(::mpact::sim::riscv::DestOpGetterMap& getter_map,
++                            ::mpact::sim::riscv::RiscVEncodingCommon* common) {
++  using ::mpact::sim::generic::DestinationOperandInterface;
++  using ::mpact::sim::generic::operator*;  // NOLINT
++  using ::mpact::sim::riscv::Insert;
++  using ::mpact::sim::riscv::RVVectorRegister;
++
++  // Vector group destination based at vd, used by vtmv.v.t (tile -> vector).
++  // vtmv.v.t uses the VArith field layout; vd is at the same bits in both.
++  Insert(getter_map, *DestOpEnum::kMatVd,
++         [common](int latency) -> DestinationOperandInterface* {
++           int num = Extractors::VArith::ExtractVd(common->inst_word());
++           return GetVectorGroupDestinationOp<RVVectorRegister>(
++               common->state(), latency, num, kRiscVZvtMatrixGroupRegs);
++         });
++}
++
++}  // namespace mpact::sim::riscv
++
++#endif  // THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_GETTERS_H_
+diff -Naur a/riscv/riscv_zvt_instructions.cc b/riscv/riscv_zvt_instructions.cc
+--- a/riscv/riscv_zvt_instructions.cc	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt_instructions.cc	2026-07-24 01:14:43.108639865 +0000
+@@ -0,0 +1,471 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "riscv/riscv_zvt_instructions.h"
++
++#include <algorithm>
++#include <cstdint>
++#include <cstring>
++
++#include "absl/base/casts.h"
++#include "absl/log/check.h"
++#include "absl/types/span.h"
++#include "mpact/sim/generic/data_buffer.h"
++#include "mpact/sim/generic/instruction.h"
++#include "riscv/riscv_register.h"
++#include "riscv/riscv_state.h"
++#include "riscv/riscv_vector_state.h"
++#include "riscv/riscv_zvt_state.h"
++
++namespace mpact::sim::riscv {
++
++using ::mpact::sim::generic::DataBuffer;
++using ::mpact::sim::generic::GetInstructionSource;
++using ::mpact::sim::generic::operator*;  // NOLINT
++using ::mpact::sim::riscv::RiscVVectorState;
++using ::mpact::sim::riscv::RV32VectorDestinationOperand;
++using ::mpact::sim::riscv::RV32VectorSourceOperand;
++
++namespace {
++
++// ELEN for the Zve32{x,f} kBase.
++constexpr int kElen = 32;
++
++// Decoded kTile subset specifier (TSS). Spec 15.1.1.5.
++struct Tss {
++  int kTile;       // bits[30:27]
++  int pattern;     // bits[26:24]: 0 = row, 1 = col.
++  uint32_t index;  // bits[23:0].
++};
++
++Tss DecodeTss(uint32_t tss) {
++  return Tss{
++      .kTile = static_cast<int>((tss >> 27) & 0xF),
++      .pattern = static_cast<int>((tss >> 24) & 0x7),
++      .index = tss & 0xFFFFFF,
++  };
++}
++
++constexpr int kTssPatternCol = 1;  // pattern 0 = row (the default branch).
++
++// Reinterprets the low 16 bits of a bf16 value as the high half of an fp32.
++float Bf16ToF32(uint16_t bits) {
++  uint32_t u = static_cast<uint32_t>(bits) << 16;
++  return absl::bit_cast<float>(u);
++}
++
++// Reads kTile element (row,col) of `kTile` at width `tile_element_width` as a
++// generic 64-bit container, and the inverse. Used by the move/load/store paths
++// which carry the element width dynamically.
++uint64_t LoadTileBits(RiscVZvtMatrixState* matrix_state, int kTile, int row,
++                      int col, int tile_element_width) {
++  const int kEffectiveTileEdge = tile_element_width < 64
++                                     ? matrix_state->tile_elements()
++                                     : matrix_state->tile_elements() / 2;
++  CHECK(row >= 0 && row < kEffectiveTileEdge) << "row out of bounds";
++  CHECK(col >= 0 && col < kEffectiveTileEdge) << "col out of bounds";
++  switch (tile_element_width) {
++    case 8:
++      return matrix_state->GetElem<uint8_t>(kTile, row, col, 8);
++    case 16:
++      return matrix_state->GetElem<uint16_t>(kTile, row, col, 16);
++    case 32:
++      return matrix_state->GetElem<uint32_t>(kTile, row, col, 32);
++    case 64:
++      return matrix_state->GetElem<uint64_t>(kTile, row, col, 64);
++    default:
++      return 0;
++  }
++}
++
++void StoreTileBits(RiscVZvtMatrixState* matrix_state, int kTile, int row,
++                   int col, int tile_element_width, uint64_t value) {
++  const int kEffectiveTileEdge = tile_element_width < 64
++                                     ? matrix_state->tile_elements()
++                                     : matrix_state->tile_elements() / 2;
++  CHECK(row >= 0 && row < kEffectiveTileEdge) << "row out of bounds";
++  CHECK(col >= 0 && col < kEffectiveTileEdge) << "col out of bounds";
++  switch (tile_element_width) {
++    case 8:
++      matrix_state->SetElem<uint8_t>(kTile, row, col, 8,
++                                     static_cast<uint8_t>(value));
++      break;
++    case 16:
++      matrix_state->SetElem<uint16_t>(kTile, row, col, 16,
++                                      static_cast<uint16_t>(value));
++      break;
++    case 32:
++      matrix_state->SetElem<uint32_t>(kTile, row, col, 32,
++                                      static_cast<uint32_t>(value));
++      break;
++    case 64:
++      matrix_state->SetElem<uint64_t>(kTile, row, col, 64, value);
++      break;
++  }
++}
++
++// Writes a 32-bit value to the scalar destination operand at `dest_index`.
++void WriteScalar(const Instruction* inst, int dest_index, uint32_t value) {
++  auto* dest = inst->Destination(dest_index);
++  DataBuffer* db = dest->AllocateDataBuffer();
++  db->Set<uint32_t>(0, value);
++  db->Submit();
++}
++
++}  // namespace
++
++void RiscVZvtMsetMtype(const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const uint32_t kRs1 = GetInstructionSource<uint32_t>(inst, 0);  // rs1
++  const uint32_t kRs2 = GetInstructionSource<uint32_t>(inst, 1);  // rs2
++
++  // Spec 15.1.1.4: vl = 0; mtype = rs1; then vtype = rs2 as if by vsetvl.
++  vector_state->set_vector_length(0);
++  matrix_state->set_mtype(kRs1);
++  vector_state->SetVectorType(kRs2);
++
++  if (matrix_state->mtwiden() == 0) {
++    matrix_state->set_mtype(0);
++    return;
++  }
++
++  const int kSewBits = vector_state->selected_element_width() * 8;
++  const int kTwiden = matrix_state->twiden();
++  const int kTileElementWidth = kSewBits * kTwiden;
++  const int kEffectiveTileElements = kTileElementWidth < 64
++                                         ? matrix_state->tile_elements()
++                                         : matrix_state->tile_elements() / 2;
++  const int kmax = RiscVZvtKmax(kSewBits);
++  const int kLmulElements =
++      vector_state->max_vector_length();  // LMUL * (VLEN/SEW).
++
++  // If the matrix unit is configured, force vma/vta = 1.
++  // TODO: also derive vtype.vlmul per the spec's min() formula; deferred while
++  // the v0.3 encoding firms up.
++  vector_state->SetVectorType(vector_state->vtype() | (1u << 6) | (1u << 7));
++
++  // kVill if the resulting TILE_ELEMENT_WIDTH is unsupported for the kBase
++  // (SEW*TWIDEN > ELEN).
++  const bool kVill = kTileElementWidth > kElen;
++  if (kVill) {
++    vector_state->set_vector_exception();
++    matrix_state->set_mtype(0);
++    return;
++  }
++
++  // kTileK = min(kTileK, KMAX); kTileM = min(kTileM, LMUL*EVE,
++  // EFFECTIVE_TILE_EDGE).
++  matrix_state->set_tile_k(std::min(matrix_state->tile_k(), kmax));
++  matrix_state->set_tile_m(std::min(
++      {matrix_state->tile_m(), kLmulElements, kEffectiveTileElements}));
++}
++
++void RiscVZvtMsetTn(const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const uint32_t kRs1 = GetInstructionSource<uint32_t>(inst, 0);
++
++  uint32_t kTileN;
++  if (matrix_state->mtwiden() == 0) {
++    // Degenerates to vsetvl using the current vtype: vl = min(rs1, VLMAX).
++    kTileN = std::min<uint32_t>(kRs1, vector_state->max_vector_length());
++  } else {
++    const int kBound = std::min(vector_state->max_vector_length(),
++                                matrix_state->effective_tile_edge());
++    kTileN = std::min<uint32_t>(kRs1, kBound);
++  }
++  vector_state->set_vector_length(kTileN);
++  WriteScalar(inst, 0, kTileN);
++}
++
++void RiscVZvtMsetTm(const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const uint32_t kRs1 = GetInstructionSource<uint32_t>(inst, 0);
++
++  uint32_t kTileM;
++  if (matrix_state->mtwiden() == 0) {
++    kTileM = 0;
++  } else {
++    const int kBound = std::min(vector_state->max_vector_length(),
++                                matrix_state->effective_tile_edge());
++    kTileM = std::min<uint32_t>(kRs1, kBound);
++  }
++  matrix_state->set_tile_m(kTileM);
++  WriteScalar(inst, 0, kTileM);
++}
++
++void RiscVZvtMsetTk(const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const uint32_t kRs1 = GetInstructionSource<uint32_t>(inst, 0);
++
++  uint32_t kTileK;
++  if (matrix_state->mtwiden() == 0) {
++    kTileK = 0;
++  } else {
++    const int kSewBits = vector_state->selected_element_width() * 8;
++    kTileK = std::min<uint32_t>(kRs1, RiscVZvtKmax(kSewBits));
++  }
++  matrix_state->set_tile_k(kTileK);
++  WriteScalar(inst, 0, kTileK);
++}
++
++// ----------------------------------------------------------------------------
++// Tile manipulation
++// ----------------------------------------------------------------------------
++
++void RiscVZvtVtZero(const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const int kTile = GetInstructionSource<uint32_t>(inst, 0);  // mtd
++  const int kTileElementWidth = matrix_state->tile_element_width_bits();
++  const int kTileM = matrix_state->tile_m();
++  const int kEffectiveTileEdge = kTileElementWidth < 64
++                                     ? matrix_state->tile_elements()
++                                     : matrix_state->tile_elements() / 2;
++  const int kTileN =
++      std::min(vector_state->vector_length(), kEffectiveTileEdge);
++  for (int row = 0; row < kTileM; row++) {
++    for (int col = 0; col < kTileN; col++) {
++      StoreTileBits(matrix_state, kTile, row, col, kTileElementWidth, 0);
++    }
++  }
++}
++
++void RiscVZvtVtDiscard(const Instruction* /*inst*/) {
++  // Architecturally hints the kTile state is dead. No-op in the ISS.
++}
++
++// Number of kTile-subset elements processed: min(vl, EFFECTIVE_TILE_EDGE) for
++// the given TILE_ELEMENT_WIDTH.
++static int TileSubsetCount(RiscVZvtMatrixState* matrix_state,
++                           RiscVVectorState* vector_state,
++                           int tile_element_width) {
++  const int kEffectiveTileEdge = tile_element_width < 64
++                                     ? matrix_state->tile_elements()
++                                     : matrix_state->tile_elements() / 2;
++  return std::min(vector_state->vector_length(), kEffectiveTileEdge);
++}
++
++void RiscVZvtVtmvVt(const Instruction* inst) {
++  // Tile row/col subset -> vector register group. Move TILE_ELEMENT_WIDTH =
++  // SEW.
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const Tss kTss = DecodeTss(GetInstructionSource<uint32_t>(inst, 0));
++  const int kSewBytes = vector_state->selected_element_width();
++  const int kTileElementWidth = kSewBytes * 8;
++  const int kCount =
++      TileSubsetCount(matrix_state, vector_state, kTileElementWidth);
++  const int kElementsPerVector =
++      vector_state->vector_register_byte_length() / kSewBytes;
++  auto* vd = static_cast<RV32VectorDestinationOperand*>(inst->Destination(0));
++  const int kNumRegs = (kCount + kElementsPerVector - 1) / kElementsPerVector;
++  for (int r = 0; r < kNumRegs; r++) {
++    DataBuffer* db = vd->AllocateDataBuffer(r);
++    absl::Span<uint8_t> bytes = db->Get<uint8_t>();
++    std::memset(bytes.data(), 0, bytes.size());  // tail-agnostic fill.
++    for (int kE = 0; kE < kElementsPerVector; kE++) {
++      const int kElem = r * kElementsPerVector + kE;
++      if (kElem >= kCount) break;
++      const uint64_t kVal =
++          (kTss.pattern == kTssPatternCol)
++              ? LoadTileBits(matrix_state, kTss.kTile, kElem, kTss.index,
++                             kTileElementWidth)
++              : LoadTileBits(matrix_state, kTss.kTile, kTss.index, kElem,
++                             kTileElementWidth);
++      std::memcpy(&bytes[kE * kSewBytes], &kVal, kSewBytes);
++    }
++    db->Submit();
++  }
++}
++
++void RiscVZvtVtmvTv(const Instruction* inst) {
++  // Vector register group -> kTile row/col subset. Move TILE_ELEMENT_WIDTH =
++  // SEW.
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  auto* vs = static_cast<RV32VectorSourceOperand*>(inst->Source(0));
++  const Tss kTss = DecodeTss(GetInstructionSource<uint32_t>(inst, 1));
++  const int kSewBytes = vector_state->selected_element_width();
++  const int kTileElementWidth = kSewBytes * 8;
++  const int kCount =
++      TileSubsetCount(matrix_state, vector_state, kTileElementWidth);
++  const int kElementsPerVector =
++      vector_state->vector_register_byte_length() / kSewBytes;
++  for (int kElem = 0; kElem < kCount; kElem++) {
++    const int kReg = kElem / kElementsPerVector;
++    const int kE = kElem % kElementsPerVector;
++    auto bytes = vs->GetRegister(kReg)->data_buffer()->Get<uint8_t>();
++    uint64_t kVal = 0;
++    std::memcpy(&kVal, &bytes[kE * kSewBytes], kSewBytes);
++    if (kTss.pattern == kTssPatternCol) {
++      StoreTileBits(matrix_state, kTss.kTile, kElem, kTss.index,
++                    kTileElementWidth, kVal);
++    } else {
++      StoreTileBits(matrix_state, kTss.kTile, kTss.index, kElem,
++                    kTileElementWidth, kVal);
++    }
++  }
++}
++
++void RiscVZvtVtle(int eew_bits, const Instruction* inst) {
++  // Memory -> kTile row/col subset. EEW is statically encoded.
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* state = matrix_state->riscv_state();
++  auto* vector_state = state->rv_vector();
++  const uint64_t kBase = GetInstructionSource<uint64_t>(inst, 0);       // rs1
++  const Tss kTss = DecodeTss(GetInstructionSource<uint32_t>(inst, 1));  // rs2
++  const int kElementSize = eew_bits / 8;
++  const int kCount = TileSubsetCount(matrix_state, vector_state, eew_bits);
++  DataBuffer* db = matrix_state->GetScratchDb(kCount * kElementSize);
++  state->memory()->Load(kBase, db, nullptr, nullptr);
++  absl::Span<uint8_t> bytes = db->Get<uint8_t>();
++  for (int kE = 0; kE < kCount; kE++) {
++    uint64_t kVal = 0;
++    std::memcpy(&kVal, &bytes[kE * kElementSize], kElementSize);
++    if (kTss.pattern == kTssPatternCol) {
++      StoreTileBits(matrix_state, kTss.kTile, kE, kTss.index, eew_bits, kVal);
++    } else {
++      StoreTileBits(matrix_state, kTss.kTile, kTss.index, kE, eew_bits, kVal);
++    }
++  }
++}
++
++void RiscVZvtVtse(int eew_bits, const Instruction* inst) {
++  // Tile row/col subset -> memory. EEW is statically encoded.
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* state = matrix_state->riscv_state();
++  auto* vector_state = state->rv_vector();
++  const uint64_t kBase = GetInstructionSource<uint64_t>(inst, 0);       // rs1
++  const Tss kTss = DecodeTss(GetInstructionSource<uint32_t>(inst, 1));  // rs2
++  const int kElementSize = eew_bits / 8;
++  const int kCount = TileSubsetCount(matrix_state, vector_state, eew_bits);
++  DataBuffer* db = matrix_state->GetScratchDb(kCount * kElementSize);
++  absl::Span<uint8_t> bytes = db->Get<uint8_t>();
++  for (int kE = 0; kE < kCount; kE++) {
++    const uint64_t kVal =
++        (kTss.pattern == kTssPatternCol)
++            ? LoadTileBits(matrix_state, kTss.kTile, kE, kTss.index, eew_bits)
++            : LoadTileBits(matrix_state, kTss.kTile, kTss.index, kE, eew_bits);
++    std::memcpy(&bytes[kE * kElementSize], &kVal, kElementSize);
++  }
++  state->memory()->Store(kBase, db);
++}
++
++// ----------------------------------------------------------------------------
++// Matrix multiply: C[m,n] += sum_k A[k,m] * B[k,n]
++// ----------------------------------------------------------------------------
++
++void RiscVZvtMatmul(RiscVZvtMatmulKind kind, const Instruction* inst) {
++  auto m_result = GetMatrixState(inst);
++  auto* matrix_state = *m_result;
++  auto* vector_state = matrix_state->riscv_state()->rv_vector();
++  const int kSewBytes = vector_state->selected_element_width();
++  const int kSewBits = kSewBytes * 8;
++  const int kElementsPerVector =
++      vector_state->vector_register_byte_length() / kSewBytes;  // elems/kReg.
++  const int kStride = 8 / RiscVZvtKmax(kSewBits);  // regs between rows.
++  const int kTileK =
++      matrix_state->tile_k();  // K: the inner dimension of the dot product.
++  const int kTileM =
++      matrix_state
++          ->tile_m();  // M: the number of rows of the accumulator kTile.
++  const int kDestTile = GetInstructionSource<uint32_t>(inst, 2);  // mtd
++  const int kTileElementWidth =
++      matrix_state
++          ->tile_element_width_bits();  // == 32 for the supported datatypes.
++  const int kEffectiveTileEdge = kTileElementWidth < 64
++                                     ? matrix_state->tile_elements()
++                                     : matrix_state->tile_elements() / 2;
++  // N: the number of columns of the accumulator kTile (derived from vector
++  // length).
++  const int kTileN =
++      std::min(vector_state->vector_length(), kEffectiveTileEdge);
++
++  auto* a = static_cast<RV32VectorSourceOperand*>(inst->Source(0));
++  auto* b = static_cast<RV32VectorSourceOperand*>(inst->Source(1));
++
++  absl::Span<uint8_t> a_spans[32] = {};
++  absl::Span<uint8_t> b_spans[32] = {};
++
++  const bool kIsFp =
++      (kind == RiscVZvtMatmulKind::kFp32 || kind == RiscVZvtMatmulKind::kBf16);
++
++  // Reads element `col` of row `kk` from a vector-group operand.
++  auto read_fp = [&](RV32VectorSourceOperand* op, absl::Span<uint8_t>* spans,
++                     int kk, int col) -> float {
++    const int kReg = kk * kStride + col / kElementsPerVector;
++    const int kE = col % kElementsPerVector;
++    if (spans[kReg].empty()) {
++      spans[kReg] = op->GetRegister(kReg)->data_buffer()->Get<uint8_t>();
++    }
++    absl::Span<uint8_t> span = spans[kReg];
++    if (kind == RiscVZvtMatmulKind::kBf16) {
++      uint16_t u;
++      std::memcpy(&u, &span[kE * kSewBytes], sizeof(u));
++      return Bf16ToF32(u);
++    }
++    float f;
++    std::memcpy(&f, &span[kE * kSewBytes], sizeof(f));
++    return f;
++  };
++  auto read_int = [&](RV32VectorSourceOperand* op, absl::Span<uint8_t>* spans,
++                      int kk, int col) -> int32_t {
++    const int kReg = kk * kStride + col / kElementsPerVector;
++    const int kE = col % kElementsPerVector;
++    if (spans[kReg].empty()) {
++      spans[kReg] = op->GetRegister(kReg)->data_buffer()->Get<uint8_t>();
++    }
++    absl::Span<uint8_t> span = spans[kReg];
++    if (kind == RiscVZvtMatmulKind::kInt8Signed) {
++      return static_cast<int8_t>(span[kE]);
++    }
++    return static_cast<uint8_t>(span[kE]);
++  };
++
++  for (int mm = 0; mm < kTileM; mm++) {
++    for (int nn = 0; nn < kTileN; nn++) {
++      if (kIsFp) {
++        float acc =
++            matrix_state->GetElem<float>(kDestTile, mm, nn, kTileElementWidth);
++        for (int kk = 0; kk < kTileK; kk++) {
++          acc += read_fp(a, a_spans, kk, mm) * read_fp(b, b_spans, kk, nn);
++        }
++        matrix_state->SetElem<float>(kDestTile, mm, nn, kTileElementWidth, acc);
++      } else {
++        int32_t acc = matrix_state->GetElem<int32_t>(kDestTile, mm, nn,
++                                                     kTileElementWidth);
++        for (int kk = 0; kk < kTileK; kk++) {
++          acc += read_int(a, a_spans, kk, mm) * read_int(b, b_spans, kk, nn);
++        }
++        matrix_state->SetElem<int32_t>(kDestTile, mm, nn, kTileElementWidth,
++                                       acc);
++      }
++    }
++  }
++}
++
++}  // namespace mpact::sim::riscv
+diff -Naur a/riscv/riscv_zvt_instructions.h b/riscv/riscv_zvt_instructions.h
+--- a/riscv/riscv_zvt_instructions.h	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt_instructions.h	2026-07-24 01:14:41.540641203 +0000
+@@ -0,0 +1,80 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Semantic functions for the RISC-V Vector Matrix Extension (Zvt / "VME",
++// spec v0.3). This header declares the matrix configuration instructions
++// (Zvtbase, spec 15.1.1.4). Tile move/load/store and the matrix-multiply
++// instructions are added in their respective translation units.
++
++#ifndef THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_INSTRUCTIONS_H_
++#define THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_INSTRUCTIONS_H_
++
++#include "mpact/sim/generic/instruction.h"
++
++namespace mpact::sim::riscv {
++
++using ::mpact::sim::generic::Instruction;
++
++// KMAX (max inner dot-product depth) as a function of SEW in bits.
++// Per spec 15.1.1.4: KMAX = max(1, 32 / SEW). int8->4, bf16(16)->2, fp32->1.
++inline int RiscVZvtKmax(int sew_bits) {
++  return sew_bits >= 32 ? 1 : (32 / sew_bits);
++}
++
++// Matrix configuration instructions (Zvtbase). All write the constrained
++// result back to the scalar destination register where applicable.
++// In the Zvt extension:
++//  - M represents the number of rows of the accumulator tile.
++//  - N represents the number of columns of the accumulator tile.
++//  - K represents the inner dimension of the dot product.
++//
++//   msetmtype rs1, rs2 : sets mtype (rs1) and vtype (rs2), zeroes vl.
++void RiscVZvtMsetMtype(const Instruction* inst);
++//   msettn rd, rs1     : sets tn (== vl), bounded by the matrix config. (N is
++//   num columns)
++void RiscVZvtMsetTn(const Instruction* inst);
++//   msettm rd, rs1     : sets mtype.tm. (M is num rows)
++void RiscVZvtMsetTm(const Instruction* inst);
++//   msettk rd, rs1     : sets mtype.tk. (K is inner dimension)
++void RiscVZvtMsetTk(const Instruction* inst);
++
++// Tile manipulation instructions (Zvtbase).
++//   vtzero mtd         : zeroes the tm x tn submatrix of tile mtd.
++void RiscVZvtVtZero(const Instruction* inst);
++//   vtdiscard          : hints the tile state is dead (no-op in the ISS).
++void RiscVZvtVtDiscard(const Instruction* inst);
++//   vtmv.v.t vd, rs1   : moves a tile row/col subset (TSS in rs1) to vd.
++void RiscVZvtVtmvVt(const Instruction* inst);
++//   vtmv.t.v rs1, vs2  : moves vs2 to a tile row/col subset (TSS in rs1).
++void RiscVZvtVtmvTv(const Instruction* inst);
++//   vtle{8,16,32,64} rs2,(rs1) : loads a tile subset (TSS rs2) from memory.
++void RiscVZvtVtle(int eew_bits, const Instruction* inst);
++//   vtse{8,16,32,64} rs2,(rs1) : stores a tile subset (TSS rs2) to memory.
++void RiscVZvtVtse(int eew_bits, const Instruction* inst);
++
++// Matrix-multiply instructions: C[m,n] += sum_k A[k,m] * B[k,n], with C in a
++// tile and A/B sourced from vector register groups (spec 15.1.1.8).
++// M is the number of rows of C, N is the number of columns of C, and
++// K is the inner dimension of the dot product.
++enum class RiscVZvtMatmulKind {
++  kInt8Signed,    // vtmms.tvv: int8 x int8 -> int32.
++  kInt8Unsigned,  // vtmmu.tvv: uint8 x uint8 -> int32.
++  kFp32,          // vtfmm.tvv: fp32 x fp32 -> fp32.
++  kBf16,          // vtfmm.alt.tvv: bf16 x bf16 -> fp32.
++};
++void RiscVZvtMatmul(RiscVZvtMatmulKind kind, const Instruction* inst);
++
++}  // namespace mpact::sim::riscv
++
++#endif  // THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_INSTRUCTIONS_H_
+diff -Naur a/riscv/riscv_zvt.isa b/riscv/riscv_zvt.isa
+--- a/riscv/riscv_zvt.isa	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt.isa	2026-07-24 01:14:41.500641237 +0000
+@@ -0,0 +1,89 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Zvtbase matrix configuration instructions (spec 15.1.1.4).
++slot riscv_zvt {
++  includes {
++    #include "riscv/riscv_zvt_instructions.h"
++  }
++  default size = 4;
++  opcodes {
++    msetmtype{: rs1, rs2 : },
++      disasm: "msetmtype", "%rs1, %rs2",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtMsetMtype";
++    msettn{: rs1 : rd},
++      disasm: "msettn", "%rd, %rs1",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtMsetTn";
++    msettm{: rs1 : rd},
++      disasm: "msettm", "%rd, %rs1",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtMsetTm";
++    msettk{: rs1 : rd},
++      disasm: "msettk", "%rd, %rs1",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtMsetTk";
++
++    // Tile manipulation.
++    vtzero{: mtd : },
++      disasm: "vtzero", "%mtd",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtVtZero";
++    vtdiscard{: : },
++      disasm: "vtdiscard",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtVtDiscard";
++    vtmv_v_t{: rs1 : matVd},
++      disasm: "vtmv.v.t", "%matVd, %rs1",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtVtmvVt";
++    vtmv_t_v{: matA, rs1 : },
++      disasm: "vtmv.t.v", "%rs1, %matA",
++      semfunc: "&::mpact::sim::riscv::RiscVZvtVtmvTv";
++
++    // Tile load/store to memory (EEW statically encoded).
++    vtle8{: rs1, rs2 : },
++      disasm: "vtle8", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtle, 8)";
++    vtle16{: rs1, rs2 : },
++      disasm: "vtle16", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtle, 16)";
++    vtle32{: rs1, rs2 : },
++      disasm: "vtle32", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtle, 32)";
++    vtle64{: rs1, rs2 : },
++      disasm: "vtle64", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtle, 64)";
++    vtse8{: rs1, rs2 : },
++      disasm: "vtse8", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtse, 8)";
++    vtse16{: rs1, rs2 : },
++      disasm: "vtse16", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtse, 16)";
++    vtse32{: rs1, rs2 : },
++      disasm: "vtse32", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtse, 32)";
++    vtse64{: rs1, rs2 : },
++      disasm: "vtse64", "%rs2, (%rs1)",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtVtse, 64)";
++
++    // Matrix multiply: C += A^T * B.
++    vtmms_tvv{: matA, matB, mtd : },
++      disasm: "vtmms.tvv", "%mtd, %matA, %matB",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtMatmul, ::mpact::sim::riscv::RiscVZvtMatmulKind::kInt8Signed)";
++    vtmmu_tvv{: matA, matB, mtd : },
++      disasm: "vtmmu.tvv", "%mtd, %matA, %matB",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtMatmul, ::mpact::sim::riscv::RiscVZvtMatmulKind::kInt8Unsigned)";
++    vtfmm_tvv{: matA, matB, mtd : fflags},
++      disasm: "vtfmm.tvv", "%mtd, %matA, %matB",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtMatmul, ::mpact::sim::riscv::RiscVZvtMatmulKind::kFp32)";
++    vtfmm_alt_tvv{: matA, matB, mtd : fflags},
++      disasm: "vtfmm.alt.tvv", "%mtd, %matA, %matB",
++      semfunc: "absl::bind_front(&::mpact::sim::riscv::RiscVZvtMatmul, ::mpact::sim::riscv::RiscVZvtMatmulKind::kBf16)";
++  }
++}
+diff -Naur a/riscv/riscv_zvt_state.cc b/riscv/riscv_zvt_state.cc
+--- a/riscv/riscv_zvt_state.cc	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt_state.cc	2026-07-24 01:14:43.116639858 +0000
+@@ -0,0 +1,129 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "riscv/riscv_zvt_state.h"
++
++#include <cstdint>
++#include <memory>
++
++#include "absl/base/nullability.h"
++#include "absl/log/check.h"
++#include "absl/log/log.h"
++#include "absl/memory/memory.h"
++#include "mpact/sim/generic/data_buffer.h"
++#include "mpact/sim/generic/instruction.h"
++#include "riscv/riscv_csr.h"
++#include "riscv/riscv_state.h"
++#include "riscv/riscv_vector_state.h"
++
++namespace mpact::sim::riscv {
++
++uint32_t RiscVMtypeCsr::AsUint32() { return matrix_state_->mtype(); }
++uint64_t RiscVMtypeCsr::AsUint64() { return matrix_state_->mtype(); }
++
++absl::StatusOr<std::unique_ptr<RiscVZvtMatrixState>>
++RiscVZvtMatrixState::Create(
++    ::mpact::sim::riscv::RiscVState* /* absl_nonnull */ state,
++    int tile_elements) {
++  auto matrix = absl::WrapUnique(new RiscVZvtMatrixState(state, tile_elements));
++  auto status = state->csr_set()->AddCsr(&matrix->mtype_csr_);
++  if (!status.ok()) return status;
++  return matrix;
++}
++
++RiscVZvtMatrixState::RiscVZvtMatrixState(
++    ::mpact::sim::riscv::RiscVState* /* absl_nonnull */ state,
++    int tile_elements)
++    : state_(state), tile_elements_(tile_elements), mtype_csr_(this, state) {
++  // TE must be a power of two in [4, VLEN/4]. VLEN/4 = 32 for VLEN=128b.
++  CHECK_GE(tile_elements_, 4) << "Tile element width must be >= 4";
++  CHECK_EQ(tile_elements_ & (tile_elements_ - 1), 0)
++      << "TE must be a power of two: " << tile_elements_;
++  tile_buffer_ = state_->db_factory()->Allocate<uint8_t>(16 * tile_elements *
++                                                         tile_elements);
++  for (auto& byte : tile_buffer_->Get<uint8_t>()) {
++    byte = 0;
++  }
++}
++
++RiscVZvtMatrixState::~RiscVZvtMatrixState() {
++  if (tile_buffer_ != nullptr) tile_buffer_->DecRef();
++  for (auto* db : scratch_dbs_) {
++    if (db != nullptr) db->DecRef();
++  }
++}
++
++::mpact::sim::generic::DataBuffer* RiscVZvtMatrixState::GetScratchDb(int size) {
++  if (size >= scratch_dbs_.size()) scratch_dbs_.resize(size + 1, nullptr);
++  if (!scratch_dbs_[size]) {
++    scratch_dbs_[size] = state_->db_factory()->Allocate<uint8_t>(size);
++  }
++  return scratch_dbs_[size];
++}
++
++int RiscVZvtMatrixState::sew_bytes() const {
++  auto* rv_vector = state_->rv_vector();
++  // selected_element_width() is in bytes; default to 1 (SEW=8) if no vector
++  // state is attached.
++  return rv_vector == nullptr ? 1 : rv_vector->selected_element_width();
++}
++
++// Transcribed verbatim from the Zvt v0.3 spec (15.1.1.1, "Tile Punning").
++int RiscVZvtMatrixState::Punning(int tile, int row, int col,
++                                 int tile_element_width) const {
++  const int kTileElements = tile_elements_;
++  int ptile, minor_offset, major_offset;
++  switch (tile_element_width) {
++    case 8: {
++      ptile = tile;
++      minor_offset = (row % 4) * 4 + (col % 4);
++      major_offset = (row / 4) * (kTileElements / 4) + (col / 4);
++      break;
++    }
++    case 16: {
++      ptile = tile + ((row & 2) >> 1);
++      minor_offset = (row % 2) * 4 + (col % 2) * 2 + ((col / 2) % 2) * 8;
++      major_offset = (row / 4) * (kTileElements / 4) + (col / 4);
++      break;
++    }
++    case 32: {
++      ptile = tile + 2 * (row / (kTileElements / 2)) + ((col & 2) >> 1);
++      minor_offset = (row % 2) * 8 + (col % 2) * 4;
++      major_offset =
++          ((row / 2) % (kTileElements / 4)) * (kTileElements / 4) + (col / 4);
++      break;
++    }
++    case 64: {
++      ptile = tile + (row / (kTileElements / 4));
++      minor_offset = (col % 2) * 8;
++      major_offset =
++          (row % (kTileElements / 4)) * (kTileElements / 4) + (col / 2);
++      break;
++    }
++    default:
++      LOG(FATAL) << "Invalid tile element width: " << tile_element_width;
++  }
++  return (ptile * kTileElements * kTileElements) + (major_offset * 16) +
++         minor_offset;
++}
++
++absl::StatusOr<RiscVZvtMatrixState*> GetMatrixState(
++    const ::mpact::sim::generic::Instruction* inst) {
++  auto* rv_state = static_cast<::mpact::sim::riscv::RiscVState*>(inst->state());
++  auto result = rv_state->csr_set()->GetCsr(kRiscVMtypeCsrIndex);
++  if (!result.ok()) return result.status();
++  return static_cast<RiscVMtypeCsr*>(*result)->matrix_state();
++}
++
++}  // namespace mpact::sim::riscv
+diff -Naur a/riscv/riscv_zvt_state.h b/riscv/riscv_zvt_state.h
+--- a/riscv/riscv_zvt_state.h	1970-01-01 00:00:00.000000000 +0000
++++ b/riscv/riscv_zvt_state.h	2026-07-24 01:14:43.120639855 +0000
+@@ -0,0 +1,205 @@
++// Copyright 2026 Google LLC
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     https://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Architectural state for the RISC-V Vector Matrix Extension (Zvt / "VME",
++// spec v0.3, chapter 15.1). This is layered on top of the existing RISC-V
++// vector state: the matrix unit sources its A/B operands from vector registers
++// and accumulates results into the new square matrix "tile" state modeled here.
++//
++// NOTE: Zvt is a draft (v0.3) extension. The mtype CSR field positions below
++// follow the v0.3 manual (15.1.1.2). They are isolated as named constants so
++// they can be adjusted if the encoding firms up.
++
++#ifndef THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_STATE_H_
++#define THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_STATE_H_
++
++#include <cstdint>
++#include <cstring>
++#include <memory>
++#include <vector>
++
++#include "absl/base/nullability.h"
++#include "absl/status/statusor.h"
++#include "mpact/sim/generic/data_buffer.h"
++#include "mpact/sim/generic/instruction.h"
++#include "riscv/riscv_csr.h"
++#include "riscv/riscv_state.h"
++
++namespace mpact::sim::riscv {
++
++// mtype CSR address (unprivileged, read-only). Spec 15.1.1.2.
++inline constexpr uint64_t kRiscVMtypeCsrIndex = 0xC23;
++
++// mtype field layout (see note above re: draft status).
++//   [1:0]   mtwiden  (0 => unconfigured; otherwise TWIDEN = 1 << (mtwiden-1))
++//   [7:5]   tk       (0..4; bounded by KMAX). K is the inner dimension of the
++//   dot product.
++//   [23:10] tm       (0..TE). M is the number of rows of the
++//   accumulator tile.
++inline constexpr uint32_t kMtypeMtwidenShift = 0;
++inline constexpr uint32_t kMtypeMtwidenMask = 0x3;
++inline constexpr uint32_t kMtypeTkShift = 5;
++inline constexpr uint32_t kMtypeTkMask = 0x7;
++inline constexpr uint32_t kMtypeTmShift = 10;
++inline constexpr uint32_t kMtypeTmMask = 0x3FFF;
++
++// Default tile-edge dimension (TE). The tile state is fixed at the
++// implementation maximum; the runtime-usable extents are bounded by tk/tm/tn.
++// Constraint (spec 15.1.1.1): TE a power of two, VLEN/4 >= TE >= 4. With
++// VLEN = 128 bits (kRiscVV2VectorByteLength = 16 bytes), VLEN/4 = 32.
++inline constexpr int kRiscVZvtDefaultTe = 32;
++
++class RiscVZvtMatrixState;
++
++// The read-only `mtype` CSR. The value lives in the owning matrix state; this
++// CSR is a read-only view (it mirrors mtype the way RiscVVl/RiscVVtype mirror
++// the vector state). Software cannot write it (write mask is 0 so `csrw mtype`
++// is a no-op); mtype is mutated only by the matrix configuration instructions.
++// The back-pointer also lets semantic functions recover the matrix state from
++// the CSR set (see GetMatrixState()).
++class RiscVMtypeCsr : public ::mpact::sim::riscv::RiscVSimpleCsr<uint32_t> {
++ public:
++  RiscVMtypeCsr(RiscVZvtMatrixState* matrix_state,
++                ::mpact::sim::riscv::RiscVState* state)
++      : ::mpact::sim::riscv::RiscVSimpleCsr<uint32_t>(
++            "mtype", kRiscVMtypeCsrIndex, /*read_mask=*/0xFFFFFFFFu,
++            /*write_mask=*/0x0u, state),
++        matrix_state_(matrix_state) {}
++
++  // Overrides: read the live value from the matrix state.
++  uint32_t AsUint32() override;
++  uint64_t AsUint64() override;
++
++  [[nodiscard]] RiscVZvtMatrixState* matrix_state() const {
++    return matrix_state_;
++  }
++
++ private:
++  RiscVZvtMatrixState* matrix_state_;
++};
++
++// Matrix tile state. Owns the flat tile buffer (16 * TE * TE bytes) and the
++// mtype CSR. All element access goes through Punning()/GetElem()/SetElem() so
++// the tile-aliasing ("punning") layout is implemented exactly once.
++class RiscVZvtMatrixState {
++ public:
++  static absl::StatusOr<std::unique_ptr<RiscVZvtMatrixState>> Create(
++      ::mpact::sim::riscv::RiscVState* /* absl_nonnull */ state,
++      int tile_elements = kRiscVZvtDefaultTe);
++
++  ~RiscVZvtMatrixState();
++
++  // Tile-edge dimension and total buffer size (bytes).
++  [[nodiscard]] int tile_elements() const { return tile_elements_; }
++  [[nodiscard]] int tile_buffer_bytes() const {
++    return tile_buffer_->size<uint8_t>();
++  }
++
++  [[nodiscard]] ::mpact::sim::riscv::RiscVState* riscv_state() const {
++    return state_;
++  }
++
++  // Byte offset into tile_buffer_ for element (tile,row,col) at the given tile
++  // element width `tile_element_width` (in bits: 8/16/32/64). Transcribed
++  // verbatim from the Zvt v0.3 spec (15.1.1.1, "Tile Punning"). `tile` is the
++  // named tile index (0..15); `tile_element_width` selects the aliasing scheme.
++  int Punning(int tile, int row, int col, int tile_element_width) const;
++
++  template <typename T>
++  T GetElem(int tile, int row, int col, int tile_element_width) const {
++    T value;
++    auto span = tile_buffer_->Get<uint8_t>();
++    std::memcpy(&value, &span[Punning(tile, row, col, tile_element_width)],
++                sizeof(T));
++    return value;
++  }
++
++  template <typename T>
++  void SetElem(int tile, int row, int col, int tile_element_width, T value) {
++    auto span = tile_buffer_->Get<uint8_t>();
++    std::memcpy(&span[Punning(tile, row, col, tile_element_width)], &value,
++                sizeof(T));
++  }
++
++  // mtype accessors. The mtype value is held here; the CSR is a read-only view.
++  [[nodiscard]] uint32_t mtype() const { return mtype_; }
++  void set_mtype(uint32_t value) { mtype_ = value; }
++
++  // Decoded mtype fields.
++  [[nodiscard]] int mtwiden() const {
++    return (mtype() >> kMtypeMtwidenShift) & kMtypeMtwidenMask;
++  }
++  // TWIDEN = 1 << (mtwiden - 1) when configured, else 0.
++  [[nodiscard]] int twiden() const {
++    return mtwiden() == 0 ? 0 : (1 << (mtwiden() - 1));
++  }
++  bool configured() const { return mtwiden() != 0; }
++  // K is the inner dimension of the dot product.
++  [[nodiscard]] int tile_k() const {
++    return (mtype() >> kMtypeTkShift) & kMtypeTkMask;
++  }
++  // M is the number of rows of the accumulator tile.
++  [[nodiscard]] int tile_m() const {
++    return (mtype() >> kMtypeTmShift) & kMtypeTmMask;
++  }
++
++  void set_tile_k(int value) { set_field(kMtypeTkShift, kMtypeTkMask, value); }
++  void set_tile_m(int value) { set_field(kMtypeTmShift, kMtypeTmMask, value); }
++
++  // Returns a pre-allocated scratchpad DataBuffer of exactly the requested
++  // size.
++  ::mpact::sim::generic::DataBuffer* GetScratchDb(int size);
++
++  // SEW (bytes/bits) from the current vector configuration.
++  [[nodiscard]] int sew_bytes() const;
++  [[nodiscard]] int sew_bits() const { return sew_bytes() * 8; }
++  // TILE_ELEMENT_WIDTH (tile element width) in bits = SEW * TWIDEN.
++  [[nodiscard]] int tile_element_width_bits() const {
++    return sew_bits() * twiden();
++  }
++  // EFFECTIVE_TILE_EDGE: effective tile edge for the current
++  // TILE_ELEMENT_WIDTH. = TE for TILE_ELEMENT_WIDTH<64, TE/2 else.
++  [[nodiscard]] int effective_tile_edge() const {
++    return tile_element_width_bits() < 64 ? tile_elements_ : tile_elements_ / 2;
++  }
++
++ private:
++  explicit RiscVZvtMatrixState(
++      ::mpact::sim::riscv::RiscVState* /* absl_nonnull */ state,
++      int tile_elements);
++
++  void set_field(uint32_t shift, uint32_t mask, int value) {
++    uint32_t v = mtype();
++    v &= ~(mask << shift);
++    v |= (static_cast<uint32_t>(value) & mask) << shift;
++    set_mtype(v);
++  }
++
++  ::mpact::sim::riscv::RiscVState* state_;
++  int tile_elements_;
++  ::mpact::sim::generic::DataBuffer* tile_buffer_;  // 16 * TE * TE bytes.
++  std::vector<::mpact::sim::generic::DataBuffer*> scratch_dbs_;
++  uint32_t mtype_ = 0;
++  RiscVMtypeCsr mtype_csr_;
++};
++
++// Recovers the matrix state from an executing instruction by looking up the
++// mtype CSR (cheap hash lookup; same idiom as the existing kCsr operand
++// getter). Returns an error if the Zvt matrix state is not installed.
++absl::StatusOr<RiscVZvtMatrixState*> GetMatrixState(
++    const ::mpact::sim::generic::Instruction* inst);
++
++}  // namespace mpact::sim::riscv
++
++#endif  // THIRD_PARTY_MPACT_RISCV_RISCV_ZVT_STATE_H_
+diff -Naur a/riscv/rvm23.bin_fmt b/riscv/rvm23.bin_fmt
+--- a/riscv/rvm23.bin_fmt	2026-06-15 20:21:03.000000000 +0000
++++ b/riscv/rvm23.bin_fmt	2026-07-24 01:14:41.528641213 +0000
+@@ -34,6 +34,7 @@
+     RiscVZihintntl,
+     // Cache prefetch instructions.
+     RiscVZicbop,
++    RiscVZicbom,
+   };
+   RVM23Inst16 = {
+     RiscVZcmop,
+@@ -50,6 +51,7 @@
+ #include "riscv32zb.bin_fmt"
+ #include "riscv_zc.bin_fmt"
+ #include "riscv_zhintpause.bin_fmt"
++#include "riscv_zicbom.bin_fmt"
+ #include "riscv_zicbop.bin_fmt"
+ #include "riscv_zicond.bin_fmt"
+ #include "riscv_zihintntl.bin_fmt"
+diff -Naur a/riscv/rvm23.isa b/riscv/rvm23.isa
+--- a/riscv/rvm23.isa	2026-06-15 20:21:03.000000000 +0000
++++ b/riscv/rvm23.isa	2026-07-24 01:14:41.524641215 +0000
+@@ -23,6 +23,7 @@
+ #include "riscv32zb.isa"
+ #include "riscv_vector.isa"
+ #include "riscv_zc.isa"
++#include "riscv_zicbom.isa"
+ #include "riscv_zicbop.isa"
+ #include "riscv_zicond.isa"
+ #include "riscv_zimop.isa"
+@@ -52,6 +53,7 @@
+   riscv_zcf32,
+   riscv_zcmp32,
+   riscv_zcmt32,
++  riscv_zicbom32,
+   riscv_zicbop32 {
+   default opcode =
+     disasm: "Illegal instruction at 0x%(@:08x)",

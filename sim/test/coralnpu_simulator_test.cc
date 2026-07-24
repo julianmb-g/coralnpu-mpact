@@ -25,13 +25,43 @@
 
 #include "sim/coralnpu_architecture.h"
 #include "sim/coralnpu_m3_user_decoder.h"
+#include "sim/coralnpu_m4_user_decoder.h"
 #include "sim/coralnpu_v2_state.h"
 #include "sim/coralnpu_v2_user_decoder.h"
 #include "sim/test/coralnpu_v2_rvv_add_intrinsic_generated.h"
 #include "googlemock/include/gmock/gmock.h"
 #include "googletest/include/gtest/gtest.h"
+#include "googlemock/include/gmock/gmock.h"
+#ifndef ABSL_EXPECT_OK
+#define ABSL_EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ABSL_ASSERT_OK
+#define ABSL_ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef EXPECT_OK
+#define EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ASSERT_OK
+#define ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef KELVIN_TEST_MATCHERS_DEFINED
+#define KELVIN_TEST_MATCHERS_DEFINED
+namespace absl_testing {
+MATCHER(IsOk, "") { return arg.ok(); }
+template <typename M>
+inline auto IsOkAndHolds(M matcher) {
+  return ::testing::AllOf(
+      ::testing::ResultOf([](const auto& s) { return s.ok(); }, ::testing::IsTrue()),
+      ::testing::ResultOf([](const auto& s) -> const auto& { return *s; }, matcher));
+}
+}  // namespace absl_testing
+namespace testing::status {
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
+}  // namespace testing::status
+#endif
 #include "absl/status/status.h"
-#include "absl/status/status_matchers.h"
+// #include "absl/status/status_matchers.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "riscv/riscv_state.h"
@@ -43,19 +73,19 @@
 #include "mpact/sim/util/memory/flat_demand_memory.h"
 #include "mpact/sim/util/program_loader/elf_program_loader.h"
 
-/* start - new test macros */
-#define ABSL_EXPECT_OK(expression) \
+/* TODO: b/471015431 - Update absl library for new test macros **
+#define EXPECT_OK(expression) \
   EXPECT_THAT(expression, ::absl_testing::IsOk())
-#define ABSL_ASSERT_OK(expression) \
+#define ASSERT_OK(expression) \
   ASSERT_THAT(expression, ::absl_testing::IsOk())
-/* end - new test macros */
+** end - new test macros */
 
 /* start - helper test macro */
 #define CONCAT_INNER(a, b) a##b
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 #define ASSERT_OK_AND_ASSIGN(lhs, rexpr)                 \
   auto CONCAT(status_or_line_, __LINE__) = (rexpr);      \
-  ABSL_ASSERT_OK(CONCAT(status_or_line_, __LINE__));          \
+  ASSERT_OK(CONCAT(status_or_line_, __LINE__));          \
   lhs = std::move(CONCAT(status_or_line_, __LINE__)).value();
 /* end - helper test macro */
 
@@ -91,7 +121,7 @@ using ::testing::Each;
 using ::testing::HasSubstr;
 using ::testing::Pointee;
 using ::testing::Values;
-using ::absl_testing::IsOkAndHolds;
+using ::testing::status::IsOkAndHolds;
 
 std::string ArchitectureName(
     const ::testing::TestParamInfo<Architecture>& info) {
@@ -100,6 +130,8 @@ std::string ArchitectureName(
       return "V2";
     case Architecture::kM3:
       return "M3";
+    case Architecture::kM4:
+      return "M4";
     default:
       return "Unknown";
   }
@@ -132,7 +164,7 @@ class CoralNPUSimulatorTest : public ::testing::TestWithParam<Architecture> {
 
     // Load the instructions into memory.
     for (const auto& inst : GetInstructions()) {
-      ABSL_ASSERT_OK(simulator_->WriteMemory(inst.address, &inst.instruction,
+      ASSERT_OK(simulator_->WriteMemory(inst.address, &inst.instruction,
                                         sizeof(inst.instruction)));
     }
   }
@@ -180,7 +212,11 @@ class CoralNPUSimulatorTest : public ::testing::TestWithParam<Architecture> {
 };
 
 TEST_P(CoralNPUSimulatorTest, TestDecoderType) {
-  if (GetParam() == Architecture::kM3) {
+  if (GetParam() == Architecture::kM4) {
+    EXPECT_NE(dynamic_cast<::coralnpu::sim::CoralNPUM4UserDecoder*>(
+                  simulator_->decoder()),
+              nullptr);
+  } else if (GetParam() == Architecture::kM3) {
     EXPECT_NE(dynamic_cast<::coralnpu::sim::CoralNPUM3UserDecoder*>(
                   simulator_->decoder()),
               nullptr);
@@ -192,10 +228,28 @@ TEST_P(CoralNPUSimulatorTest, TestDecoderType) {
 }
 
 TEST_P(CoralNPUSimulatorTest, TestArchitectureId) {
-  if (GetParam() == Architecture::kM3) {
+  if (GetParam() == Architecture::kM4) {
+    EXPECT_EQ(simulator_->state()->id(), "CoralNPUM4");
+  } else if (GetParam() == Architecture::kM3) {
     EXPECT_EQ(simulator_->state()->id(), "CoralNPUM3");
   } else {
     EXPECT_EQ(simulator_->state()->id(), "CoralNPUV2");
+  }
+}
+
+TEST_P(CoralNPUSimulatorTest, TestMatrixStateExistsForM4) {
+  auto mtype_status =
+      simulator_->state()->csr_set()->GetCsr(0xC23);  // mtype CSR index
+  if (GetParam() == Architecture::kM4) {
+    EXPECT_OK(mtype_status) << "M4 should have matrix state and mtype CSR.";
+    if (mtype_status.ok()) {
+      // Read the CSR to ensure the matrix_state_ object is actually alive
+      // (catches use-after-free).
+      EXPECT_EQ((*mtype_status)->AsUint64(), 0);
+    }
+  } else {
+    EXPECT_FALSE(mtype_status.ok())
+        << "Non-M4 architectures should not have mtype CSR.";
   }
 }
 
@@ -204,13 +258,13 @@ TEST_P(CoralNPUSimulatorTest, TestMisaStretching) {
   // bit 30 is set. StretchMisa32 should move it to bit 62.
   // For RV32, this results in the bit being preserved in the 32-bit register.
   auto misa_status = simulator_->ReadRegister("misa");
-  ABSL_ASSERT_OK(misa_status);
+  ASSERT_OK(misa_status);
   EXPECT_EQ(*misa_status, 0x40201120ULL);
 }
 
 TEST_P(CoralNPUSimulatorTest, TestIntegerRegisters) {
-  for (int i = 0; i < 32; ++i) {
-    ABSL_ASSERT_OK(simulator_->WriteRegister(absl::StrCat("x", i), i));
+  for (int i = 0; i < 32; i++) {
+    ASSERT_OK(simulator_->WriteRegister(absl::StrCat("x", i), i));
     ASSERT_OK_AND_ASSIGN(uint32_t value,
                          simulator_->ReadRegister(absl::StrCat("x", i)));
     EXPECT_EQ(value, i);
@@ -218,8 +272,8 @@ TEST_P(CoralNPUSimulatorTest, TestIntegerRegisters) {
 }
 
 TEST_P(CoralNPUSimulatorTest, TestFloatingPointRegisters) {
-  for (int i = 0; i < 32; ++i) {
-    ABSL_ASSERT_OK(simulator_->WriteRegister(absl::StrCat("f", i), i));
+  for (int i = 0; i < 32; i++) {
+    ASSERT_OK(simulator_->WriteRegister(absl::StrCat("f", i), i));
     ASSERT_OK_AND_ASSIGN(uint64_t value,
                          simulator_->ReadRegister(absl::StrCat("f", i)));
     EXPECT_EQ(value, i);
@@ -227,7 +281,7 @@ TEST_P(CoralNPUSimulatorTest, TestFloatingPointRegisters) {
 }
 
 TEST_P(CoralNPUSimulatorTest, TestVectorRegisters) {
-  for (int i = 0; i < 32; ++i) {
+  for (int i = 0; i < 32; i++) {
     ASSERT_OK_AND_ASSIGN(DataBuffer * reg_db, simulator_->GetRegisterDataBuffer(
                                                   absl::StrCat("v", i)));
     EXPECT_NE(reg_db, nullptr);
@@ -236,19 +290,19 @@ TEST_P(CoralNPUSimulatorTest, TestVectorRegisters) {
 
 TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicMpause) {
   // Run the simulation to the end.
-  ABSL_ASSERT_OK(simulator_->Run());
-  ABSL_ASSERT_OK(simulator_->Wait());
+  ASSERT_OK(simulator_->Run());
+  ASSERT_OK(simulator_->Wait());
 
   // Verify that the simulation stopped after the mpause instruction.
   absl::StatusOr<uint64_t> pc = simulator_->ReadRegister("pc");
-  ABSL_ASSERT_OK(pc);
+  ASSERT_OK(pc);
   EXPECT_EQ(*pc, kMpauseAddress + 4);
 }
 
 TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicReadMemory) {
   // Run the simulation to the end.
-  ABSL_ASSERT_OK(simulator_->Run());
-  ABSL_ASSERT_OK(simulator_->Wait());
+  ASSERT_OK(simulator_->Run());
+  ASSERT_OK(simulator_->Wait());
 
   // This elf is not a self checking test so we will manually verify the output
   // array.
@@ -257,12 +311,12 @@ TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicReadMemory) {
 
 TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicSetBreakpoint) {
   // Set the breakpoint and run the simulation.
-  ABSL_ASSERT_OK(simulator_->SetSwBreakpoint(kMemSetBreakpointAddress));
-  ABSL_ASSERT_OK(simulator_->Run());
+  ASSERT_OK(simulator_->SetSwBreakpoint(kMemSetBreakpointAddress));
+  ASSERT_OK(simulator_->Run());
 
   int breakpoint_hit_count = 0;
   bool unexpected_simulation_halt = false;
-  ABSL_EXPECT_OK(KeepRunningUntilDone([&](uint64_t pc) {
+  EXPECT_OK(KeepRunningUntilDone([&](uint64_t pc) {
     if (pc == kMemSetBreakpointAddress) {
       breakpoint_hit_count++;
       return true;  // Continue running after a breakpoint.
@@ -278,12 +332,12 @@ TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicSetBreakpoint) {
 
 TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicWriteRegister) {
   // Set the breakpoint and run the simulation.
-  ABSL_ASSERT_OK(simulator_->SetSwBreakpoint(kMemSetBreakpointAddress));
-  ABSL_ASSERT_OK(simulator_->Run());
+  ASSERT_OK(simulator_->SetSwBreakpoint(kMemSetBreakpointAddress));
+  ASSERT_OK(simulator_->Run());
 
   bool unexpected_simulation_halt = false;
   std::vector<absl::Status> write_register_statuses;
-  ABSL_EXPECT_OK(KeepRunningUntilDone([&](uint64_t pc) {
+  EXPECT_OK(KeepRunningUntilDone([&](uint64_t pc) {
     if (pc == kMemSetBreakpointAddress) {
       write_register_statuses.push_back(
           simulator_->WriteRegister("pc", kMemSetReturnInstructionAddress));
@@ -302,7 +356,8 @@ TEST_P(CoralNPUSimulatorTest, TestRvvAddIntrinsicWriteRegister) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Architecture, CoralNPUSimulatorTest,
-                         Values(Architecture::kV2, Architecture::kM3),
+                         Values(Architecture::kV2, Architecture::kM3,
+                                Architecture::kM4),
                          ArchitectureName);
 
 using CoralNPUSimulatorParamTest = ::testing::TestWithParam<Architecture>;
@@ -316,7 +371,7 @@ TEST_P(CoralNPUSimulatorParamTest, TestLoadProgramPermissions) {
   auto simulator = std::make_unique<CoralNPUSimulator>(options);
 
   std::string elf_path = GetElfPath(kHelloSemihostElf);
-  ABSL_ASSERT_OK(simulator->LoadProgram(elf_path));
+  ASSERT_OK(simulator->LoadProgram(elf_path));
 
   // The ELF has an executable segment. Check if it's executable.
   // For coralnpu_v2_rvv_add_intrinsic.elf, the code is at 0x0.
@@ -333,7 +388,7 @@ TEST_P(CoralNPUSimulatorParamTest, TestLoadProgramElfSegments) {
   auto simulator = std::make_unique<CoralNPUSimulator>(options);
 
   std::string elf_path = GetElfPath(kHelloSemihostElf);
-  ABSL_ASSERT_OK(simulator->LoadProgram(elf_path));
+  ASSERT_OK(simulator->LoadProgram(elf_path));
 
   // For coralnpu_v2_rvv_add_intrinsic.elf:
   // .text is at 0x0, size > 0, flags R X
@@ -373,11 +428,11 @@ TEST_P(CoralNPUSimulatorParamTest, TestEbreakExitOnEbreak) {
   ASSERT_EQ(written, 4);
 
   // Set PC to 0x1000.
-  ABSL_ASSERT_OK(simulator->WriteRegister("pc", 0x1000));
+  ASSERT_OK(simulator->WriteRegister("pc", 0x1000));
 
   // Run the simulation.
-  ABSL_ASSERT_OK(simulator->Run());
-  ABSL_ASSERT_OK(simulator->Wait());
+  ASSERT_OK(simulator->Run());
+  ASSERT_OK(simulator->Wait());
 
   // Check if it halted due to ebreak (kUserRequest).
   ASSERT_OK_AND_ASSIGN(HaltReasonValueType halt_reason,
@@ -432,7 +487,7 @@ TEST_P(CoralNPUSimulatorParamTest, TestHtifAddresses) {
   std::string elf_path = GetElfPath(kHelloSemihostElf);
   auto memory = std::make_unique<FlatDemandMemory>();
   auto loader = std::make_unique<ElfProgramLoader>(memory.get());
-  ABSL_ASSERT_OK(loader->LoadProgram(elf_path));
+  ASSERT_OK(loader->LoadProgram(elf_path));
 
   auto magic = CoralNPUSimulator::GetHtifMagicAddresses(loader.get());
   ASSERT_TRUE(magic.has_value());
@@ -456,12 +511,12 @@ TEST_P(CoralNPUSimulatorParamTest, TestSemihostHtifDisabled) {
 
   auto simulator = std::make_unique<CoralNPUSimulator>(options);
 
-  ABSL_ASSERT_OK(simulator->LoadProgram(elf_path));
+  ASSERT_OK(simulator->LoadProgram(elf_path));
 
   testing::internal::CaptureStdout();
 
   // Run the simulation for a short while.
-  ABSL_ASSERT_OK(simulator->Step(1000));
+  ASSERT_OK(simulator->Step(1000));
 
   std::string output = testing::internal::GetCapturedStdout();
   // If semihost_htif is false, we should NOT see the semihosting output.
@@ -482,7 +537,7 @@ TEST_P(CoralNPUSimulatorParamTest, TestInvalidCsrDecode) {
   uint32_t addr = 0x1000;
   simulator->state()->AddMemoryRegion(addr, 4,
                                       MemoryPermission::kReadWriteExecute);
-  ABSL_ASSERT_OK(simulator->WriteMemory(addr, &inst_word, 4));
+  ASSERT_OK(simulator->WriteMemory(addr, &inst_word, 4));
 
   auto* inst = simulator->decoder()->DecodeInstruction(addr);
   ASSERT_NE(inst, nullptr);
@@ -494,7 +549,8 @@ TEST_P(CoralNPUSimulatorParamTest, TestInvalidCsrDecode) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Architecture, CoralNPUSimulatorParamTest,
-                         Values(Architecture::kV2, Architecture::kM3),
+                         Values(Architecture::kV2, Architecture::kM3,
+                                Architecture::kM4),
                          ArchitectureName);
 
 TEST(CoralNPUV2StateTest, TestMultipleMpauseHandlers) {
@@ -575,13 +631,13 @@ TEST_P(CoralNPUSimulatorSemihostTest, TestHelloWordSemihost) {
 
   auto simulator = std::make_unique<CoralNPUSimulator>(options);
 
-  ABSL_ASSERT_OK(simulator->LoadProgram(elf_path));
+  ASSERT_OK(simulator->LoadProgram(elf_path));
 
   testing::internal::CaptureStdout();
 
   // Run the simulation.
-  ABSL_ASSERT_OK(simulator->Run());
-  ABSL_ASSERT_OK(simulator->Wait());
+  ASSERT_OK(simulator->Run());
+  ASSERT_OK(simulator->Wait());
 
   std::string output = testing::internal::GetCapturedStdout();
   EXPECT_THAT(output, HasSubstr("this looks like atv's magic"));
@@ -595,7 +651,8 @@ TEST_P(CoralNPUSimulatorSemihostTest, TestHelloWordSemihost) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Architecture, CoralNPUSimulatorSemihostTest,
-                         Values(Architecture::kV2, Architecture::kM3),
+                         Values(Architecture::kV2, Architecture::kM3,
+                                Architecture::kM4),
                          ArchitectureName);
 
 }  // namespace

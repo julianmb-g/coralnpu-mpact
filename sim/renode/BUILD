@@ -31,11 +31,11 @@ cc_library(
     deps = [
         ":renode_debug_interface",
         "//sim:coralnpu_top",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/strings",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
-        "@com_google_mpact-sim//mpact/sim/util/program_loader:elf_loader",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
+        "@mpact-sim//mpact/sim/util/program_loader:elf_loader",
     ],
     alwayslink = True,
 )
@@ -44,9 +44,9 @@ cc_library(
     name = "renode_debug_interface",
     hdrs = ["renode_debug_interface.h"],
     deps = [
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_mpact-sim//mpact/sim/generic:core_debug_interface",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@mpact-sim//mpact/sim/generic:core_debug_interface",
     ],
 )
 
@@ -60,11 +60,11 @@ cc_library(
     ],
     deps = [
         "//sim:coralnpu_state",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/numeric:bits",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/util/memory",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/numeric:bits",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/util/memory",
     ],
 )
 
@@ -81,14 +81,14 @@ cc_library(
     deps = [
         ":renode_debug_interface",
         "//sim:coralnpu_top",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_mpact-riscv//riscv:riscv_debug_info",
-        "@com_google_mpact-sim//mpact/sim/generic:core",
-        "@com_google_mpact-sim//mpact/sim/generic:core_debug_interface",
-        "@com_google_mpact-sim//mpact/sim/generic:instruction",
-        "@com_google_mpact-sim//mpact/sim/generic:type_helpers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@mpact-riscv//riscv:riscv_debug_info",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:core_debug_interface",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
     alwayslink = True,
 )

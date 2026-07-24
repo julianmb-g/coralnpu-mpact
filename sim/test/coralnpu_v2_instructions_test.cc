@@ -25,9 +25,38 @@
 #include "sim/coralnpu_v2_state.h"
 #include "googlemock/include/gmock/gmock.h"
 #include "googletest/include/gtest/gtest.h"
+#include "googlemock/include/gmock/gmock.h"
+#ifndef ABSL_EXPECT_OK
+#define ABSL_EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ABSL_ASSERT_OK
+#define ABSL_ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef EXPECT_OK
+#define EXPECT_OK(x) EXPECT_TRUE((x).ok())
+#endif
+#ifndef ASSERT_OK
+#define ASSERT_OK(x) ASSERT_TRUE((x).ok())
+#endif
+#ifndef KELVIN_TEST_MATCHERS_DEFINED
+#define KELVIN_TEST_MATCHERS_DEFINED
+namespace absl_testing {
+MATCHER(IsOk, "") { return arg.ok(); }
+template <typename M>
+inline auto IsOkAndHolds(M matcher) {
+  return ::testing::AllOf(
+      ::testing::ResultOf([](const auto& s) { return s.ok(); }, ::testing::IsTrue()),
+      ::testing::ResultOf([](const auto& s) -> const auto& { return *s; }, matcher));
+}
+}  // namespace absl_testing
+namespace testing::status {
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
+}  // namespace testing::status
+#endif
 #include "absl/functional/any_invocable.h"
 #include "absl/functional/bind_front.h"
-#include "absl/status/status_matchers.h"
+// #include "absl/status/status_matchers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "riscv/riscv_f_instructions.h"
@@ -46,17 +75,17 @@
 #include "mpact/sim/util/memory/flat_demand_memory.h"
 #include "mpact/sim/util/memory/memory_interface.h"
 
-/* start - new test macros */
-#define ABSL_EXPECT_OK(expression) \
+/* TODO: b/471015431 - Update absl library for new test macros **
+#define EXPECT_OK(expression) \
   EXPECT_THAT(expression, ::absl_testing::IsOk())
-#define ABSL_ASSERT_OK(expression) \
+#define ASSERT_OK(expression) \
   ASSERT_THAT(expression, ::absl_testing::IsOk())
-/* end - new test macros */
+** end - new test macros */
 
 /* start - helper test macro */
 #define ASSERT_OK_AND_ASSIGN(lhs, rexpr) \
   auto status_or = (rexpr); \
-  ABSL_ASSERT_OK(status_or); \
+  ASSERT_OK(status_or); \
   lhs = std::move(status_or).value();
 /* end - helper test macro */
 
@@ -170,13 +199,13 @@ class CoralNPUV2InstructionTest : public ::testing::Test {
       reg_name = absl::StrCat("x", i);
       x_regs_.push_back(new RV32Register(state_.get(), reg_name));
       state_->AddRegister(reg_name, x_regs_.back());
-      ABSL_ASSERT_OK(state_->AddRegisterAlias<RV32Register>(reg_name,
+      ASSERT_OK(state_->AddRegisterAlias<RV32Register>(reg_name,
                                                        kXRegisterAliases[i]));
 
       reg_name = absl::StrCat("f", i);
       f_regs_.push_back(new RVFpRegister(state_.get(), reg_name));
       state_->AddRegister(reg_name, f_regs_.back());
-      ABSL_ASSERT_OK(state_->AddRegisterAlias<RVFpRegister>(reg_name,
+      ASSERT_OK(state_->AddRegisterAlias<RVFpRegister>(reg_name,
                                                        kFRegisterAliases[i]));
 
       reg_name = absl::StrCat("v", i);

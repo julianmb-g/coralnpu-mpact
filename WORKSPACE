@@ -22,14 +22,6 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_license/releases/download/1.0.0/rules_license-1.0.0.tar.gz"],
 )
 
-# MPACT-RiscV repo
-http_archive(
-    name = "com_google_mpact-riscv",
-    sha256 = "38faef26745f34a82de0daf3b65a207c8d2ecf825f37484a4a27132512583574",
-    strip_prefix = "mpact-riscv-cb68bd4a2cb80dea24d9760dc6397b5854ea41bd",
-    url = "https://github.com/google/mpact-riscv/archive/cb68bd4a2cb80dea24d9760dc6397b5854ea41bd.tar.gz",
-)
-
 # Download only the single svdpi.h file.
 http_file(
     name = "svdpi_h_file",
@@ -37,18 +29,6 @@ http_file(
     sha256 = "2528c8e529b66dd8e795c8a0fee326166cc51f7dee8fc6a0c6c930534fc780a6",
     urls = ["https://raw.githubusercontent.com/verilator/verilator/v5.028/include/vltstd/svdpi.h"],
 )
-
-load("@com_google_mpact-riscv//:repos.bzl", "mpact_riscv_repos")
-
-mpact_riscv_repos()
-
-load("@com_google_mpact-riscv//:dep_repos.bzl", "mpact_riscv_dep_repos")
-
-mpact_riscv_dep_repos()
-
-load("@com_google_mpact-riscv//:deps.bzl", "mpact_riscv_deps")
-
-mpact_riscv_deps()
 
 http_archive(
     name = "rules_python",
