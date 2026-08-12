@@ -1,74 +1,124 @@
-#!/bin/sh
+#!/bin/bash
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# build_unified_asm.sh
+
 set -e
 
-# Pre-flight workspace purge (ADR 007 / Pristine Workspace Mandate)
-# Purge stale artifacts from the local workspace to prevent contamination.
-rm -f /workspace/out_coremark_unified.S /workspace/*.log
+# 3.1.3: Compile unified assembly natively via GCC (ADR 023)
+# ADR 020, ADR 031: Enforce C99 standard (-std=c99)
+# ADR 027: Enforce march (-march=rv32imf_zve32f_zicsr_zifencei_zbb)
+# ADR 029: Enforce mabi (-mabi=ilp32f)
 
-cd /tmp
+# $1: output directory (@D)
+# $2: common_cflags.sh
+# $3: coremark_unified.c
+# $4...: core_portme files
+# $Last-2: crt0.S
+# $Last-1: linker.ld
+# $Last: format_asm.sh
 
-# Create a temporary build directory within the container
-mkdir -p build_dir
-cd build_dir
+# Get arguments
+out_dir=$1
+common_cflags_file=$2
+coremark_unified_c=$3
+shift 3
+num_args=$#
+format_asm=${@:$num_args:1}
+linker_ld=${@:$((num_args-1)):1}
+crt0_s=${@:$((num_args-2)):1}
+# Everything else is core_portme files
+core_portme_files=${@:1:$((num_args-3))}
 
-# Download and verify Coremark v1.01 directly (ADR 007)
-wget -qO coremark.tar.gz https://github.com/eembc/coremark/archive/refs/tags/v1.01.tar.gz
-echo "99c5a6d63af85a281b4e4d6ccb522c446653c435dfec9455ad73ef9e71f28bde  coremark.tar.gz" | sha256sum -c -
-tar -xzf coremark.tar.gz
-mv coremark-1.01 coremark_src
+tmp_dir=$(mktemp -d)
+mkdir -p "$tmp_dir/build_context"
+podman_vfs_dir="$tmp_dir/podman_vfs"
+mkdir -p "$podman_vfs_dir"
+mkdir -p "$out_dir"
 
-find coremark_src -name "core_portme.h" -delete
-mv coremark_src/coremark.h coremark_src/coremark_authentic.h
-echo '#include "coremark_authentic.h"' > coremark_src/coremark.h
+# Clean up on exit
+trap 'rm -rf "$tmp_dir" 2>/dev/null || true' EXIT
 
-# JUSTIFICATION FOR SOURCE MODIFICATION (ADR 006 / Global Concept Anti-Hallucination):
-# Use grep -v to filter out conflicting macro definitions
-grep -v "#define matrix_clip" coremark_src/core_matrix.c > coremark_src/core_matrix.c.tmp && mv coremark_src/core_matrix.c.tmp coremark_src/core_matrix.c
-grep -v "#define matrix_big" coremark_src/core_matrix.c > coremark_src/core_matrix.c.tmp && mv coremark_src/core_matrix.c.tmp coremark_src/core_matrix.c
-grep -v "#define bit_extract" coremark_src/core_matrix.c > coremark_src/core_matrix.c.tmp && mv coremark_src/core_matrix.c.tmp coremark_src/core_matrix.c
+echo "DEBUG: tmp_dir is $tmp_dir"
 
-# Update core_main.c known CRC tables with authentic float baselines (ADR 006)
-sed -i "s/0xe714/0x2ff5/g" coremark_src/core_main.c
-sed -i "s/0x1fd7/0x6dfb/g" coremark_src/core_main.c
-sed -i "s/0x8e3a/0x0000/g" coremark_src/core_main.c
+# Extract Coremark source on the host to allow patching (ADR 001, ADR 002)
+echo "DEBUG: Extracting /tmp/coremark.tar.gz"
+# Verify SHA256 checksum on host (ADR 003, ADR 021, ADR 033)
+echo "99c5a6d63af85a281b4e4d6ccb522c446653c435dfec9455ad73ef9e71f28bde  /tmp/coremark.tar.gz" | sha256sum -c || exit 1
+tar xzf /tmp/coremark.tar.gz -C "$tmp_dir/build_context" --strip-components=1
 
-# JUSTIFICATION FOR SOURCE MODIFICATION (Finding #229):
-# Delete the static memory block declaration to ensure usage of our portable_malloc.
-sed -i "/static char static_memblk\[.*\];/d" coremark_src/core_main.c
+# ADR 001, ADR 002: Inject include guards into coremark.h and other files
+# to prevent redefinition errors during unified build.
+# Use python3 on the host to avoid restricted tools (ADR 001, ADR 002 violation).
+echo "DEBUG: Patching files"
+python3 -c "import sys; c = sys.stdin.read(); print('#ifndef COREMARK_H_GUARD\n#define COREMARK_H_GUARD\n' + c + '\n#endif')" < "$tmp_dir/build_context/coremark.h" > "$tmp_dir/build_context/coremark.h.tmp" && mv "$tmp_dir/build_context/coremark.h.tmp" "$tmp_dir/build_context/coremark.h"
 
-# ADR 005 & Finding #260: Patch coremark_authentic.h for float baselines instead of using a hijacked wrapper.
-sed -i "s/typedef ee_s16 MATDAT;/typedef ee_f32 MATDAT;/g" coremark_src/coremark_authentic.h
-sed -i "s/typedef ee_s32 MATRES;/typedef ee_f32 MATRES;/g" coremark_src/coremark_authentic.h
-sed -i "s/#define MATDAT_INT 1/#define MATDAT_INT 0/g" coremark_src/coremark_authentic.h
-sed -i "s/#define MATDAT_FLOAT 0/#define MATDAT_FLOAT 1/g" coremark_src/coremark_authentic.h
+python3 -c "import sys; c = sys.stdin.read(); print(c.replace('#define matrix_clip', '#ifndef matrix_clip\n#define matrix_clip').replace(' & 0x0ffff)', ' & 0x0ffff)\n#endif').replace('#define matrix_big', '#ifndef matrix_big\n#define matrix_big').replace('(0xf000 | (x))', '(0xf000 | (x))\n#endif').replace('#define bit_extract', '#ifndef bit_extract\n#define bit_extract').replace(' << (to))))', ' << (to))))\n#endif'))" < "$tmp_dir/build_context/core_matrix.c" > "$tmp_dir/build_context/core_matrix.c.tmp" && mv "$tmp_dir/build_context/core_matrix.c.tmp" "$tmp_dir/build_context/core_matrix.c"
 
-mkdir coralnpu_port
-cp /workspace/local_core_portme.h coralnpu_port/core_portme.h
-cp /workspace/local_core_portme.c coralnpu_port/core_portme.c
+python3 -c "import sys; c = sys.stdin.read(); print(c.replace('#define MATDAT_INT', '#ifndef MATDAT_INT\n#define MATDAT_INT').replace('#define MATDAT_INT 1', '#define MATDAT_INT 1\n#endif').replace('typedef double secs_ret;', '#ifndef secs_ret\ntypedef double secs_ret;\n#endif').replace('typedef ee_u32 secs_ret;', '#ifndef secs_ret\ntypedef ee_u32 secs_ret;\n#endif').replace('#define ee_printf printf', '#ifndef ee_printf\n#define ee_printf printf\n#endif'))" < "$tmp_dir/build_context/coremark.h" > "$tmp_dir/build_context/coremark.h.tmp" && mv "$tmp_dir/build_context/coremark.h.tmp" "$tmp_dir/build_context/coremark.h"
 
-# Load common compiler flags
-. /workspace/local_common_cflags.sh
+# Create the Dockerfile using the preloaded base image
+cat <<EOF > "$tmp_dir/Dockerfile.tmp"
+FROM coremark-builder-base:latest
+WORKDIR /coremark
+EOF
 
-# Compile from the patched source separately to isolate vectorization
-COREMARK_SRCS="coralnpu_port/core_portme.c coremark_src/core_list_join.c coremark_src/core_state.c coremark_src/core_main.c coremark_src/core_util.c coremark_src/core_matrix.c"
+# Copy port files and scripts into the same build_context
+echo "DEBUG: Copying port files"
+cp -L "$common_cflags_file" "$tmp_dir/build_context/host_common_cflags.sh"
+cp -L "$coremark_unified_c" "$tmp_dir/build_context/coremark_unified.c"
+cp -L $core_portme_files "$tmp_dir/build_context/"
+cp -L "$crt0_s" "$tmp_dir/build_context/crt0.S"
+cp -L "$linker_ld" "$tmp_dir/build_context/linker.ld"
+cp -L "$format_asm" "$tmp_dir/build_context/format_asm.sh"
 
-OBJS=""
-for src in $COREMARK_SRCS; do
-  base=$(basename "$src" .c)
-  riscv-none-elf-gcc $COMMON_CFLAGS -DHAS_FLOAT=1 -DEE_TYPES_DEFINED -I./coralnpu_port -I./coremark_src -S "$src" -o "${base}.S" || exit 1
-  # Rename local labels in each assembly file to avoid collisions when concatenated
-  sed -E -i "s/\.L([1-9][0-9]*)/\.L_${base}_\1/g; s/\.LC([0-9]+)/\.LC_${base}_\1/g; s/\.LANCHOR([0-9]+)/\.LANCHOR_${base}_\1/g" "${base}.S"
-  sed -i "/\.attribute/d" "${base}.S"
-  
-  # Assemble for validation linkage (Finding #258)
-  riscv-none-elf-gcc -c $COMMON_CFLAGS "${base}.S" -o "${base}.o" || exit 1
-  OBJS="$OBJS ${base}.o"
-done
+# Load the base image and tag it for Dockerfile.tmp
+if [[ -f "/tmp/coremark-builder.tar" ]]; then
+  podman --root "$podman_vfs_dir" --runroot "$tmp_dir/runroot" --storage-driver=vfs load -i "/tmp/coremark-builder.tar" > /dev/null
+  podman --root "$podman_vfs_dir" --runroot "$tmp_dir/runroot" --storage-driver=vfs tag localhost/coremark-builder:latest coremark-builder-base > /dev/null || true
+fi
 
-# Assemble crt0
-riscv-none-elf-gcc -c $COMMON_CFLAGS /workspace/local_crt0.S -o local_crt0.o || exit 1
+# Build the Docker image from preloaded base
+podman --root "$podman_vfs_dir" --runroot "$tmp_dir/runroot" --storage-driver=vfs build -q -t coremark-builder -f "$tmp_dir/Dockerfile.tmp" "$tmp_dir" > /dev/null
 
-# Link independent .o files using custom linker script (Finding #258)
-riscv-none-elf-gcc -u _printf_float -nostartfiles -T/workspace/local_linker.ld -Wl,-Map,/workspace/coremark_unified_tmp.map $COMMON_CFLAGS -DHAS_FLOAT=1 -DEE_TYPES_DEFINED local_crt0.o $OBJS -o /workspace/coremark_unified_tmp.elf -lm || exit 1
+# Run the container and mount the build context
+# ADR 003: Use --userns=keep-id:uid=1000,gid=1000
+podman --root "$podman_vfs_dir" --runroot "$tmp_dir/runroot" --storage-driver=vfs run --userns=keep-id:uid=1000,gid=1000 \
+    -v "$tmp_dir/build_context":/build_context:Z \
+    -v "$(pwd)/$out_dir":/output:Z \
+    coremark-builder \
+    /bin/sh -c " \
+    set -e; \
+    cd /build_context; \
+    . /build_context/host_common_cflags.sh; \
+    # ADR 001, ADR 002: Use header wrapping instead of forbidden content modification.
+    riscv-none-elf-gcc \$COMMON_CFLAGS -mno-riscv-attribute -mno-relax -I/build_context -I. -S -o /output/coremark_unified.S coremark_unified.c; \
+    riscv-none-elf-gcc \$COMMON_CFLAGS -mno-riscv-attribute -mno-relax -c -o crt0.o crt0.S; \
+    riscv-none-elf-gcc \$COMMON_CFLAGS \
+        -nostartfiles \
+        -T/build_context/linker.ld \
+        -Wl,-Map=/output/coremark_unified.map \
+        -o /output/coremark_unified.elf \
+        crt0.o \
+        /output/coremark_unified.S \
+        -lc -lm -lgcc; \
+    riscv-none-elf-objdump -d /output/coremark_unified.elf > /output/coremark_unified.objdump; \
+    "
 
-cat core_portme.S core_list_join.S core_state.S core_main.S core_util.S core_matrix.S > /workspace/out_coremark_unified.S
+echo "DEBUG: contents of $out_dir on host:"
+ls -l "$out_dir"
+
+# Format the generated assembly on the host (ADR 012)
+chmod +x "$format_asm"
+bash "$format_asm" "$(pwd)/$out_dir/coremark_unified.S"

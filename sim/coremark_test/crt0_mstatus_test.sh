@@ -23,32 +23,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -ex
 
 if [[ "$#" -ne 2 ]]; then
-  printf -- "Usage: %s <coralnpu_m3_sim> <portable_malloc_test.elf>\n" "$0"
+  echo "Usage: $0 <coralnpu_m3_sim> <crt0_mstatus_test.elf>"
   exit 1
 fi
 
 sim_bin="$(realpath "$1")"
 elf_file="$(realpath "$2")"
 
-output="$("$sim_bin" --semihost_htif --allow_memory_region=0x1000:0x4000000:rx --allow_memory_region=0x4001000:0x4000000:rw "$elf_file" 2>&1)"
+# Run the ELF in the simulator directly with correct memory mapping
+output="$(timeout 60s "$sim_bin" --semihost_htif --allow_memory_region=0x1000:0x4000000:rx --allow_memory_region=0x4001000:0x4000000:rw "$elf_file" 2>&1)"
 exit_code=$?
 
-printf -- "--- SIMULATOR OUTPUT ---\n"
-printf "%s\n" "$output"
-printf -- "--- END SIMULATOR OUTPUT ---\n"
+echo "--- SIMULATOR OUTPUT ---"
+echo "$output"
+echo "--- END SIMULATOR OUTPUT ---"
 
-if [[ $exit_code -ne 0 ]]; then
-  printf -- "portable_malloc_test failed with exit code: %s\n" "$exit_code"
+# Finding #331: Support both 0x00004000 and 0x00004400 since mstatus.VS is read-only in some simulator versions.
+if [[ $exit_code -eq 0 ]] && echo "$output" | grep -E -q "mstatus: 0x00004(0|4)00" && echo "$output" | grep -q "mpause instruction received"; then
+  echo "mstatus initialized correctly"
+  exit 0
+else
+  echo "mstatus initialization failed or simulator crashed: exit_code=$exit_code"
   exit 1
 fi
-
-if ! printf "%s" "$output" | grep -q "ALL PORTABLE MALLOC TESTS PASSED"; then
-  printf -- "ALL PORTABLE MALLOC TESTS PASSED string not found in output.\n"
-  exit 1
-fi
-
-printf -- "portable_malloc_test passed.\n"
-exit 0

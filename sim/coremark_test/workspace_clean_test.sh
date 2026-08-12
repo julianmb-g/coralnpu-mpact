@@ -13,7 +13,7 @@ if [[ "$real_dir" =~ ^(.*)/\.snapshot/[0-9]+/(.*)$ ]]; then
   real_dir="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
 fi
 
-for path in "$real_dir" "${TEST_SRCDIR}/google3/learning/brain/research/kelvin/sim/coremark_test" "learning/brain/research/kelvin/sim/coremark_test" "$(dirname "$0")"; do
+for path in "$real_dir" "${TEST_SRCDIR}/google3/sim/coremark_test" "sim/coremark_test" "$(dirname "$0")"; do
   if [[ -d "$path" ]] && [[ -f "$path/BUILD" ]]; then
     target_dir="$path"
     break

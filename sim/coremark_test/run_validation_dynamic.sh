@@ -112,7 +112,7 @@ printf "Compilation successful. Validating...\n"
 # Authentic validation: No mocking logic is used here; simulator output is parsed directly.
 set +e
 start_time=$(date +%s.%N)
-output=$(timeout 600s python3 "$TEST_SRCDIR/google3/learning/brain/research/kelvin/sim/coremark_test/pty_runner.py" "$sim_bin" --semihost_htif "$tmp_dir/coremark_unified_tmp.elf" 2>&1)
+output=$(timeout 600s python3 "$TEST_SRCDIR/google3/sim/coremark_test/pty_runner.py" "$sim_bin" --semihost_htif "$tmp_dir/coremark_unified_tmp.elf" 2>&1)
 exit_code=$?
 end_time=$(date +%s.%N)
 host_time=$(python3 -c "print(f'{float($end_time) - float($start_time):.3f}')")

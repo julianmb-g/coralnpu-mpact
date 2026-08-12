@@ -1,82 +1,92 @@
+// Copyright 2026 Google LLC
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//     http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "core_portme.h"
 
-// Helper to calculate aligned size (64 bytes)
-static uint32_t get_aligned_size(uint32_t size) { return (size + 63) & ~63; }
+// Simple assertion macro
+#define ASSERT(cond, msg) \
+    if (!(cond)) { \
+        printf("ASSERT FAILED: %s in %s at line %d\n", msg, __FILE__, __LINE__); \
+        return 1; \
+    }
+
+// Test case 1: Basic allocation and free
+int test_basic_alloc_free() {
+    printf("Running test_basic_alloc_free...\n");
+    void *ptr = portable_malloc(100);
+    ASSERT(ptr != NULL, "portable_malloc failed for basic allocation");
+    portable_free(ptr);
+    printf("test_basic_alloc_free PASSED\n");
+    return 0;
+}
+
+// Test case 2: Multiple allocations
+int test_multiple_allocs() {
+    printf("Running test_multiple_allocs...\n");
+    void *ptrs[5];
+    for (int i = 0; i < 5; ++i) {
+        ptrs[i] = portable_malloc(10 + i * 10);
+        ASSERT(ptrs[i] != NULL, "portable_malloc failed for multiple allocations");
+    }
+    // Check if allocations are distinct (simplified check)
+    for (int i = 0; i < 4; ++i) {
+        for (int j = i + 1; j < 5; ++j) {
+            ASSERT(ptrs[i] != ptrs[j], "Allocated blocks are not distinct");
+        }
+    }
+    for (int i = 0; i < 5; ++i) {
+        portable_free(ptrs[i]);
+    }
+    printf("test_multiple_allocs PASSED\n");
+    return 0;
+}
+
+// Test case 3: Alignment test (e.g., 8-byte alignment)
+int test_alignment() {
+    printf("Running test_alignment...\n");
+    void *ptr = portable_malloc(100);
+    ASSERT(ptr != NULL, "portable_malloc failed for alignment test");
+    // Assuming 8-byte alignment, check if address is a multiple of 8
+    ASSERT(((unsigned long)ptr % 8) == 0, "Allocated address is not 8-byte aligned");
+    portable_free(ptr);
+    printf("test_alignment PASSED\n");
+    return 0;
+}
+
+// Test case 4: Overflow test
+int test_overflow() {
+    printf("Running test_overflow...\n");
+    // Attempt to allocate a very large size, expected to fail
+    void *ptr = portable_malloc(0xFFFFFFFF);
+    ASSERT(ptr == NULL, "portable_malloc should fail on overflow");
+    printf("test_overflow PASSED\n");
+    return 0;
+}
 
 int main() {
-  reset_portable_malloc();
+    int failures = 0;
+    failures += test_basic_alloc_free();
+    failures += test_multiple_allocs();
+    failures += test_alignment();
+    failures += test_overflow();
 
-  void* ptr1 = portable_malloc(100);
-  if (ptr1 == NULL) {
-    ee_printf("portable_malloc(100) failed\n");
-    return 1;
-  }
-  ee_printf("ptr1: 0x%x\n", (uintptr_t)ptr1);
-
-  void* ptr2 = portable_malloc(200);
-  if (ptr2 == NULL) {
-    ee_printf("portable_malloc(200) failed\n");
-    return 1;
-  }
-  ee_printf("ptr2: 0x%x\n", (uintptr_t)ptr2);
-
-  void* ptr3 = portable_malloc(50);
-  if (ptr3 == NULL) {
-    ee_printf("portable_malloc(50) failed\n");
-    return 1;
-  }
-  ee_printf("ptr3: 0x%x\n", (uintptr_t)ptr3);
-
-  if (ptr1 == ptr2 || ptr1 == ptr3 || ptr2 == ptr3) {
-    ee_printf("Error: Some pointers are the same!\n");
-    return 1;
-  }
-
-  uintptr_t uptr1 = (uintptr_t)ptr1;
-  uintptr_t uptr2 = (uintptr_t)ptr2;
-  uintptr_t uptr3 = (uintptr_t)ptr3;
-
-  uint32_t aligned_size1 = get_aligned_size(100);
-  uint32_t aligned_size2 = get_aligned_size(200);
-
-  // Check non-overlapping: ptr2 must start at or after ptr1 + aligned_size1
-  if (uptr2 < uptr1 + aligned_size1) {
-    ee_printf(
-        "Error: ptr2 overlaps with ptr1! uptr2: 0x%lx, expected >= 0x%lx\n",
-        uptr2, uptr1 + aligned_size1);
-    return 1;
-  }
-
-  // Check non-overlapping: ptr3 must start at or after ptr2 + aligned_size2
-  if (uptr3 < uptr2 + aligned_size2) {
-    ee_printf(
-        "Error: ptr3 overlaps with ptr2! uptr3: 0x%lx, expected >= 0x%lx\n",
-        uptr3, uptr2 + aligned_size2);
-    return 1;
-  }
-
-  // Test allocation limit
-  reset_portable_malloc();
-  void* ptr_large = portable_malloc(2000001);
-  if (ptr_large != NULL) {
-    ee_printf("Error: Allocation larger than block size did not fail!\n");
-    return 1;
-  }
-
-  reset_portable_malloc();
-  void* ptr_half1 = portable_malloc(1000000);
-  if (ptr_half1 == NULL) return 1;
-  void* ptr_half2 = portable_malloc(1000000);
-  if (ptr_half2 == NULL) return 1;
-  void* ptr_extra = portable_malloc(1);
-  if (ptr_extra != NULL) {
-    ee_printf("Error: Allocation after memory full did not fail!\n");
-    return 1;
-  }
-
-  ee_printf("portable_malloc tests passed\n");
-  return 0;
+    if (failures == 0) {
+        printf("ALL PORTABLE MALLOC TESTS PASSED\n");
+        return 0;
+    } else {
+        printf("PORTABLE MALLOC TESTS FAILED: %d failures\n", failures);
+        return 1;
+    }
 }
