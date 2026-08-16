@@ -21,7 +21,6 @@
 #include "sim/coralnpu_m4_encoding.h"
 #include "sim/coralnpu_m4_enums.h"
 #include "sim/coralnpu_v2_state.h"
-#include "absl/base/nullability.h"
 #include "riscv/riscv_state.h"
 #include "mpact/sim/generic/instruction.h"
 #include "mpact/sim/generic/program_error.h"

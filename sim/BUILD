@@ -273,7 +273,6 @@ cc_library(
     deps = [
         ":coralnpu_v2_getters",
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
         "@mpact-riscv//riscv:riscv_encoding_common",
@@ -299,7 +298,6 @@ cc_library(
         ":coralnpu_v2_encoding_template",
         ":coralnpu_v2_isa",
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@mpact-riscv//riscv:riscv_generic_decoder",
         "@mpact-riscv//riscv:riscv_state",
         "@mpact-sim//mpact/sim/generic:arch_state",
@@ -316,7 +314,6 @@ cc_library(
     hdrs = ["coralnpu_v2_getters.h"],
     copts = ["-O3"],
     deps = [
-        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status:statusor",
@@ -340,7 +337,6 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/types:span",
         "@mpact-riscv//riscv:riscv_g",
         "@mpact-riscv//riscv:riscv_state",
@@ -419,7 +415,6 @@ cc_library(
     deps = [
         ":coralnpu_state",
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@mpact-riscv//riscv:riscv_state",
         "@mpact-sim//mpact/sim/generic:instruction",
     ],
@@ -496,7 +491,6 @@ cc_library(
         ":coralnpu_m3_isa",
         ":coralnpu_v2_encoding_template",
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@mpact-riscv//riscv:riscv_generic_decoder",
         "@mpact-riscv//riscv:riscv_state",
         "@mpact-sim//mpact/sim/generic:arch_state",
@@ -629,7 +623,6 @@ cc_library(
         ":coralnpu_m4_isa",
         ":coralnpu_v2_encoding_template",
         ":coralnpu_v2_state",
-        "@abseil-cpp//absl/base:nullability",
         "@mpact-riscv//riscv:riscv_generic_decoder",
         "@mpact-riscv//riscv:riscv_state",
         "@mpact-riscv//riscv:riscv_zvt_getters",
@@ -1116,5 +1109,27 @@ cc_library(
         "@abseil-cpp//absl/status",
         "@mpact-sim//mpact/sim/generic:core",
         "@mpact-sim//mpact/sim/util/memory",
+    ],
+)
+
+cc_library(
+    name = "coralnpu_m3_instructions",
+    srcs = [
+        "coralnpu_m3_instructions.cc",
+    ],
+    hdrs = [
+        "coralnpu_m3_instructions.h",
+    ],
+    copts = ["-O3"],
+    deps = [
+        ":coralnpu_state",
+        "@abseil-cpp//absl/base",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_g",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+        "@mpact-sim//mpact/sim/generic:type_helpers",
     ],
 )

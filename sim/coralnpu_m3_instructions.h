@@ -33,6 +33,14 @@ using ::mpact::sim::generic::Instruction;
 // Destination operand 0: floating point destination register.
 // Destination operand 1: fflags/fcsr destination register.
 void CoralNPUFcvtBf16S(Instruction* inst);
+void FcvtBf16S(Instruction* inst);
+void FcvtSBf16(Instruction* inst);
+
+// Semantic function for Vfwcvtbf16ffv instruction.
+void Vfwcvtbf16ffv(Instruction* inst);
+
+// Semantic function for Vfncvtbf16ffw instruction.
+void Vfncvtbf16ffw(Instruction* inst);
 
 }  // namespace coralnpu::sim
 

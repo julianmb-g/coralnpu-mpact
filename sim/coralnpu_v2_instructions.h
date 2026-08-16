@@ -15,7 +15,6 @@
 #ifndef SIM_CORALNPU_V2_INSTRUCTIONS_H_
 #define SIM_CORALNPU_V2_INSTRUCTIONS_H_
 
-#include "absl/base/nullability.h"
 #include "riscv/riscv_state.h"
 #include "mpact/sim/generic/instruction.h"
 

@@ -18,7 +18,6 @@
 #include <type_traits>
 
 #include "sim/coralnpu_v2_state.h"
-#include "absl/base/nullability.h"
 #include "absl/types/span.h"
 #include "riscv/riscv_f_instructions.h"
 #include "riscv/riscv_i_instructions.h"

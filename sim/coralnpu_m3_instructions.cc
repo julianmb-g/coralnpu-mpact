@@ -19,12 +19,16 @@
 #include "sim/coralnpu_m3_instructions.h"
 
 #include <cstdint>
+#include <functional>
 
+#include "sim/coralnpu_state.h"
 #include "absl/base/casts.h"
 #include "riscv/riscv_fp_info.h"
 #include "riscv/riscv_fp_state.h"
 #include "riscv/riscv_instruction_helpers.h"
+#include "riscv/riscv_register.h"
 #include "riscv/riscv_state.h"
+#include "riscv/riscv_vector_state.h"
 #include "mpact/sim/generic/data_buffer.h"
 #include "mpact/sim/generic/register.h"
 #include "mpact/sim/generic/type_helpers.h"
@@ -32,11 +36,15 @@
 namespace coralnpu::sim {
 using ::mpact::sim::generic::FPTypeInfo;
 using ::mpact::sim::generic::operator*;  // NOLINT: clang-tidy false positive.
+using ::mpact::sim::generic::GetInstructionSource;
 using ::mpact::sim::generic::RegisterDestinationOperand;
 using ::mpact::sim::riscv::FPExceptions;
 using ::mpact::sim::riscv::FPRoundingMode;
 using ::mpact::sim::riscv::GetNaNBoxedSource;
 using ::mpact::sim::riscv::RiscVFPState;
+using ::mpact::sim::riscv::RiscVState;
+using ::mpact::sim::riscv::RV32VectorDestinationOperand;
+using ::mpact::sim::riscv::RV32VectorSourceOperand;
 namespace {
 
 // Internal layout parameters, bitmasks, and predicate functions for bfloat16
@@ -138,6 +146,42 @@ uint16_t ConvertF32ToBF16(uint32_t bits, uint32_t rm_val,
   }
   return RoundBFloat16(bits, rm_val, state->rv_fp(), fflags);
 }
+
+float ConvertBF16ToF32(uint16_t bf16) {
+  uint32_t f32_bits = static_cast<uint32_t>(bf16) << 16;
+  return absl::bit_cast<float>(f32_bits);
+}
+
+struct ConversionResultF32 {
+  uint32_t result = 0;
+  uint32_t fflags = 0;
+};
+
+ConversionResultF32 ConvertBF16ToF32Precise(uint16_t bf16_bits) {
+  constexpr uint32_t kBF16ExpShift = 7;
+  constexpr uint32_t kBF16ExpMask = 0xFF;
+  constexpr uint32_t kBF16MantissaMask = 0x7F;
+  constexpr uint32_t kBF16SNaNBit = 0x40;
+  constexpr uint32_t kFloat32MantissaShift = 16;
+  constexpr uint32_t kFloat32CanonicalNan = 0x7FC00000;
+
+  uint32_t src_bits = bf16_bits;
+  uint32_t exp = (src_bits >> kBF16ExpShift) & kBF16ExpMask;
+  uint32_t frac = src_bits & kBF16MantissaMask;
+
+  if (exp == kBF16ExpMask && frac != 0) {
+    // NaN input.
+    uint32_t fflags = 0;
+    if ((frac & kBF16SNaNBit) == 0) {
+      // SNaN
+      fflags = *FPExceptions::kInvalidOp;
+    }
+    return {kFloat32CanonicalNan, fflags};
+  }
+
+  return {src_bits << kFloat32MantissaShift, 0};
+}
+
 }  // namespace
 
 void CoralNPUFcvtBf16S(Instruction* inst) {
@@ -188,6 +232,300 @@ void CoralNPUFcvtBf16S(Instruction* inst) {
   auto* fflags_db = inst->Destination(1)->AllocateDataBuffer();
   fflags_db->Set<uint32_t>(0, fflags);
   fflags_db->Submit();
+}
+
+void FcvtBf16S(Instruction* inst) { CoralNPUFcvtBf16S(inst); }
+
+void FcvtSBf16(Instruction* inst) {
+  auto* state = static_cast<::mpact::sim::riscv::RiscVState*>(inst->state());
+  if (state == nullptr || state->rv_fp() == nullptr) {
+    return;
+  }
+
+  // Check floating-point unit enable bit in mstatus.
+  if (state->mstatus()->fs() == 0) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  uint32_t rm_val = inst->Source(1)->AsUint32(0);
+  if (rm_val != 0) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  uint32_t src_bits = GetInstructionSource<uint32_t>(inst, 0);
+
+  // Validate 16-bit NaN-boxing (upper 16 bits of the 32-bit register must be
+  // all 1s).
+  constexpr uint32_t kFP32NaNBoxedMask = 0xFFFF0000;
+  bool is_boxed = (src_bits & kFP32NaNBoxedMask) == kFP32NaNBoxedMask;
+
+  ConversionResultF32 conv;
+  if (!is_boxed) {
+    constexpr uint32_t kFloat32CanonicalNan = 0x7FC00000;
+    conv.result = kFloat32CanonicalNan;
+    conv.fflags = 0;
+  } else {
+    uint16_t bf16_bits = static_cast<uint16_t>(src_bits & 0xFFFF);
+    conv = ConvertBF16ToF32Precise(bf16_bits);
+  }
+
+  auto* dest_db = inst->Destination(0)->AllocateDataBuffer();
+  dest_db->Set<uint64_t>(0, 0xFFFFFFFF00000000ULL | conv.result);
+  dest_db->Submit();
+
+  if (inst->DestinationsSize() >= 2 && inst->Destination(1) != nullptr) {
+    auto* fflags_db = inst->Destination(1)->AllocateDataBuffer();
+    fflags_db->Set<uint32_t>(0, conv.fflags);
+    fflags_db->Submit();
+  }
+}
+
+void Vfwcvtbf16ffv(Instruction* inst) {
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  if (state == nullptr || state->rv_fp() == nullptr ||
+      state->rv_vector() == nullptr) {
+    return;
+  }
+
+  // Check floating-point unit and vector unit enable bits in mstatus.
+  bool fs_enabled = state->mstatus()->fs() != 0;
+  bool vs_enabled = ((state->mstatus()->GetUint64() >> 9) & 0b11) != 0;
+  if (!fs_enabled || !vs_enabled) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  if (inst->DestinationsSize() == 0 || inst->SourcesSize() == 0 ||
+      inst->Destination(0) == nullptr || inst->Source(0) == nullptr) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  auto* vd = static_cast<RV32VectorDestinationOperand*>(inst->Destination(0));
+  auto* vs2 = static_cast<RV32VectorSourceOperand*>(inst->Source(0));
+
+  // Check register group overlap (widening requires vd to not overlap vs2).
+  bool overlaps = false;
+  for (int dest_reg_idx = 0; dest_reg_idx < vd->size(); ++dest_reg_idx) {
+    auto* dest_reg = std::any_cast<mpact::sim::generic::RegisterBase*>(
+        vd->GetObject(dest_reg_idx));
+    for (int src_reg_idx = 0; src_reg_idx < vs2->size(); ++src_reg_idx) {
+      auto* src_reg = vs2->GetRegister(src_reg_idx);
+      if (dest_reg == src_reg) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (overlaps) break;
+  }
+
+  if (overlaps) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  auto* vstate = state->rv_vector();
+  int vl = vstate->vector_length();
+  int vstart = vstate->vstart();
+  uint32_t fflags = 0;
+
+  bool is_masked = false;
+  RV32VectorSourceOperand* mask_op = nullptr;
+  if (inst->SourcesSize() >= 2) {
+    auto* vm_op = inst->Source(1);
+    if (vm_op != nullptr && !vm_op->AsString().empty() &&
+        vm_op->AsString() != "__VectorTrue__") {
+      is_masked = true;
+      mask_op = static_cast<RV32VectorSourceOperand*>(vm_op);
+    }
+  }
+
+  absl::Span<const uint8_t> mask_span;
+  if (is_masked) {
+    mask_span = mask_op->GetRegister(0)->data_buffer()->Get<uint8_t>();
+  }
+
+  int elements_per_vector =
+      vstate->vector_register_byte_length() / sizeof(float);
+
+  int last_reg = -1;
+  ::mpact::sim::generic::DataBuffer* dest_db = nullptr;
+  absl::Span<float> dest_span;
+
+  for (int vector_index = vstart; vector_index < vl; ++vector_index) {
+    int reg = vector_index / elements_per_vector;
+    int i = vector_index % elements_per_vector;
+    if (reg != last_reg) {
+      if (dest_db != nullptr) {
+        dest_db->Submit();
+      }
+      dest_db = vd->CopyDataBuffer(reg);
+      dest_span = dest_db->Get<float>();
+      last_reg = reg;
+    }
+
+    bool mask_value = true;
+    if (is_masked) {
+      int mask_index = vector_index >> 3;
+      int mask_offset = vector_index & 0b111;
+      mask_value = ((mask_span[mask_index] >> mask_offset) & 0b1) != 0;
+    }
+
+    if (mask_value) {
+      uint16_t bf16 = GetInstructionSource<uint16_t>(inst, 0, vector_index);
+      auto conv = ConvertBF16ToF32Precise(bf16);
+      dest_span[i] = absl::bit_cast<float>(conv.result);
+      fflags |= conv.fflags;
+    }
+  }
+
+  if (dest_db != nullptr) {
+    dest_db->Submit();
+  }
+  // Clear vstart.
+  vstate->clear_vstart();
+
+  // Update fflags.
+  if (fflags != 0) {
+    uint32_t current_fflags = state->rv_fp()->fflags()->GetUint32();
+    state->rv_fp()->fflags()->Set(current_fflags | fflags);
+  }
+}
+
+void Vfncvtbf16ffw(Instruction* inst) {
+  auto* state = static_cast<CoralNPUState*>(inst->state());
+  if (state == nullptr || state->rv_fp() == nullptr ||
+      state->rv_vector() == nullptr) {
+    return;
+  }
+
+  // Check floating-point unit and vector unit enable bits in mstatus.
+  bool fs_enabled = state->mstatus()->fs() != 0;
+  bool vs_enabled = ((state->mstatus()->GetUint64() >> 9) & 0b11) != 0;
+  if (!fs_enabled || !vs_enabled) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  if (inst->DestinationsSize() == 0 || inst->SourcesSize() == 0 ||
+      inst->Destination(0) == nullptr || inst->Source(0) == nullptr) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  if (!state->rv_fp()->rounding_mode_valid()) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  auto* vd = static_cast<RV32VectorDestinationOperand*>(inst->Destination(0));
+  auto* vs2 = static_cast<RV32VectorSourceOperand*>(inst->Source(0));
+
+  // Check register group overlap (narrowing requires vd to not overlap vs2).
+  bool overlaps = false;
+  for (int dest_reg_idx = 0; dest_reg_idx < vd->size(); ++dest_reg_idx) {
+    auto* dest_reg = std::any_cast<mpact::sim::generic::RegisterBase*>(
+        vd->GetObject(dest_reg_idx));
+    for (int src_reg_idx = 0; src_reg_idx < vs2->size(); ++src_reg_idx) {
+      auto* src_reg = vs2->GetRegister(src_reg_idx);
+      if (dest_reg == src_reg) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (overlaps) break;
+  }
+
+  if (overlaps) {
+    state->Trap(/*is_interrupt=*/false, /*trap_value=*/0,
+                *mpact::sim::riscv::ExceptionCode::kIllegalInstruction,
+                /*epc=*/inst->address(), inst);
+    return;
+  }
+
+  auto* vstate = state->rv_vector();
+  int vl = vstate->vector_length();
+  int vstart = vstate->vstart();
+  uint32_t rm = *state->rv_fp()->GetRoundingMode();
+  uint32_t fflags = 0;
+
+  bool is_masked = false;
+  RV32VectorSourceOperand* mask_op = nullptr;
+  if (inst->SourcesSize() >= 2) {
+    auto* vm_op = inst->Source(1);
+    if (vm_op != nullptr && !vm_op->AsString().empty() &&
+        vm_op->AsString() != "__VectorTrue__") {
+      is_masked = true;
+      mask_op = static_cast<RV32VectorSourceOperand*>(vm_op);
+    }
+  }
+
+  absl::Span<const uint8_t> mask_span;
+  if (is_masked) {
+    mask_span = mask_op->GetRegister(0)->data_buffer()->Get<uint8_t>();
+  }
+
+  int elements_per_vector =
+      vstate->vector_register_byte_length() / sizeof(uint16_t);
+
+  int last_reg = -1;
+  ::mpact::sim::generic::DataBuffer* dest_db = nullptr;
+  absl::Span<uint16_t> dest_span;
+
+  for (int vector_index = vstart; vector_index < vl; ++vector_index) {
+    int reg = vector_index / elements_per_vector;
+    int i = vector_index % elements_per_vector;
+    if (reg != last_reg) {
+      if (dest_db != nullptr) {
+        dest_db->Submit();
+      }
+      dest_db = vd->CopyDataBuffer(reg);
+      dest_span = dest_db->Get<uint16_t>();
+      last_reg = reg;
+    }
+
+    bool mask_value = true;
+    if (is_masked) {
+      int mask_index = vector_index >> 3;
+      int mask_offset = vector_index & 0b111;
+      mask_value = ((mask_span[mask_index] >> mask_offset) & 0b1) != 0;
+    }
+
+    if (mask_value) {
+      float f32 = GetInstructionSource<float>(inst, 0, vector_index);
+      uint32_t f32_bits = absl::bit_cast<uint32_t>(f32);
+      uint16_t bf16 = ConvertF32ToBF16(f32_bits, rm, state, &fflags);
+      dest_span[i] = bf16;
+    }
+  }
+
+  if (dest_db != nullptr) {
+    dest_db->Submit();
+  }
+  // Clear vstart.
+  vstate->clear_vstart();
+
+  // Update fflags.
+  uint32_t current_fflags = state->rv_fp()->fflags()->GetUint32();
+  state->rv_fp()->fflags()->Set(current_fflags | fflags);
 }
 
 }  // namespace coralnpu::sim

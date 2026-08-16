@@ -502,3 +502,25 @@ cc_test(
         "@mpact-sim//mpact/sim/util/memory",
     ],
 )
+
+cc_test(
+    name = "coralnpu_m3_instructions_test",
+    size = "small",
+    srcs = ["coralnpu_m3_instructions_test.cc"],
+    copts = ["-Werror"],
+    deps = [
+        "//sim:coralnpu_architecture",
+        "//sim:coralnpu_m3_instructions",
+        "//sim:coralnpu_simulator",
+        "//sim:coralnpu_v2_state",
+        "@com_google_googletest//:gtest_main",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@mpact-riscv//riscv:riscv_fp_state",
+        "@mpact-riscv//riscv:riscv_state",
+        "@mpact-sim//mpact/sim/generic:arch_state",
+        "@mpact-sim//mpact/sim/generic:core",
+        "@mpact-sim//mpact/sim/generic:instruction",
+    ],
+)

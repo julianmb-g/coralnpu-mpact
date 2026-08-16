@@ -19,7 +19,6 @@
 
 #include "sim/coralnpu_v2_getters.h"
 #include "sim/coralnpu_v2_state.h"
-#include "absl/base/nullability.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/any_invocable.h"
 #include "riscv/riscv_encoding_common.h"
